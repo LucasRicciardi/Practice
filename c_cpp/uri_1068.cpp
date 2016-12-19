@@ -19,7 +19,7 @@ bool check(string& c)
 		if (a == ')')
 			if (s.empty())
 				return false;
-		else
+			else
 			s.pop();
 	}
 
