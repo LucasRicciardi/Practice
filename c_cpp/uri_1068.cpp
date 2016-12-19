@@ -20,7 +20,7 @@ bool check(string& c)
 			if (s.empty())
 				return false;
 			else
-			s.pop();
+				s.pop();
 	}
 
 	return s.empty();
