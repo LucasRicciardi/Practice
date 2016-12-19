@@ -1,86 +1,85 @@
-//https://www.urionlinejudge.com.br/judge/pt/problems/view/1062
-
+// https://www.urionlinejudge.com.br/judge/pt/problems/view/1063
 
 #include <iostream>
 #include <stack>
-#include <vector>
+#include <queue>
 
 using namespace std;
 
-void remove(vector<int>& priority, stack<int>& out )
+void read(queue<string>& s, int n)
 {
-	while (true)		
+	for (int i = 0; i < n; i++)
 	{
-		if ( out.empty() or priority.empty()) 		// Se as pilhas estiverem vazias, volta.		
+		string a; cin >> a;
+		s.push(a);
+	}	
+}
+
+void remove(stack<string>& s, queue<string>& v)
+{
+	while (true)
+	{
+		if (s.empty() or v.empty())				// Se algum dos dois estiverem vazios, volte;
 		{
 			return;
 		}
-		else if (out.top() not_eq priority.front())			// Se o topo da pilha não for igual ao do vetor, volta também.
+		else if ( s.top() not_eq v.front()) 
 		{
 			return;
 		}
 		else
 		{
-			priority.erase(priority.begin());
-			out.pop();
-		}	
+			v.pop();
+			s.pop();
+			cout << "R";
+		}
 	}
 }
 
-bool verify(stack<int>& in, stack<int>& out, vector<int>& priority)
+void insere(stack<string>& s, queue<string>& r)
 {
-	while ( not in.empty() )
-	{
-		remove(priority, out);			// Retira as coisas dela.
+	s.push(r.front());
+	r.pop();
+	cout << "I";
+}
 
-		out.push(in.top()); 		// Insere o último na nova pilha
-		in.pop();					// Remove o elemento da lista anterior		
+bool verify(queue<string>& s, queue<string>& v)
+{
+	stack<string> out;
+
+	while (not s.empty())		// Enquanto a entrada não estiver vazia
+	{
+		remove(out, v);			// Remova os elementos v da saída 
+		insere(out, s);
 	}
 
-	if (not out.empty())			// Se a pilha ainda não estiver vazia,
-		remove(priority, out);				// remove o que ainda tiver nela.
+	if (not out.empty())		// Se a saída ainda não estiver vazia
+		remove(out, v);
 
-	return out.empty();				// Retorna true se a pilha de saída estiver vazia.
+	return out.empty();
 }
 
 int main(int argc, char const *argv[])
 {
-	int n, m;
+	int n;
 
 	while (true)
 	{
-		START:
-
 		cin >> n;
+
 		if (not n)
 			return 0;
 
-		while (true)
-		{
-			vector<int> priority;
-			stack<int> in;
-			stack<int> out;
+		queue<string> 	in;
+		queue<string> out;
 
-			for (int i = n; i > 0; i--)
-				in.push(i);
+		read(in, n); read(out, n);
 
-			for (int i = 0; i < n; i++)
-			{
-				int a; cin >> a;
+		if ( not verify(in, out))
+			cout << " Impossible";
 
-				if (not a)
-				{
-					cout << endl;
-					goto START;
-				}
-
-				priority.push_back(a);
-			}
-			
-			if (verify(in, out, priority))
-				cout << "Yes" << endl;
-			else
-				cout << "No" << endl;
-		}
+		cout << endl;	 
 	}
+
+	return 0;
 }
