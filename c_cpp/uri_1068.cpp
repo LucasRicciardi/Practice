@@ -19,8 +19,8 @@ bool check(string& c)
 		if (a == ')')
 			if (s.empty())
 				return false;
-		else
-			s.pop();
+			else
+				s.pop();
 	}
 
 	return s.empty();
