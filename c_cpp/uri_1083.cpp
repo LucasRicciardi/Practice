@@ -6,7 +6,7 @@
 
 using namespace std;
 
-int procedencia(char c)
+int precedencia(char c)
 {
 	if (c == '^')
 		return 6;
@@ -64,7 +64,7 @@ string check_stack(stack<char>& v, char c)
 			if (v.top() == '(')
 				break;
 
-			if (procedencia(c) > procedencia(v.top()))
+			if (precedencia(c) > precedencia(v.top()))
 				break;
 
 			r += v.top(); v.pop();
