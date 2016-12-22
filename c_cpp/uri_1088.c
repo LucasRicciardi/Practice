@@ -3,7 +3,6 @@
 // Este aqui em especial foi bem difícil de entender...
 // A solução encontra-se no problema de encontar o número 
 // de inversões num vetor, ou seja, v[i] < v[j] e j > i.
-// Para tal
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,13 +48,13 @@ void intercala(int * v, int p, int q, int r, int * t)
 		{
 			//        índices   p  p+1 ..  q  q+1 q+2 ..  r 	Veja que a posição do elemento [2] no vetor
  			// 	Vetor original [1] [3] .. [5] [2] [4] .. [6]	original era (q+1) e no vetor ordenado é (p+1),
-			//													portanto ele se deslocou (q+1)-(p+1) = (q-p) posições.		
-			//  0   1     q-p        0   1    r-q-1				Ao dividirmos os vetores em dois vetores ordenados, 
-			// [1] [3] .. [5]  <->  [2] [4] .. [6]				o da esquerda está na ordem correta, portanto,
-			//													movimentamos (desinvertemos) apenas os elementos que	
-			//   p  p+1 ..  q  q+1 q+2 ..  r 					estão no vetor da direita. De forma que o número total		
-			//  [1] [2] .. [3] [4] [5] .. [6]					inversões será o quanto o elemento se deslocou em relação
-			//     												à sua posição original.		 
+			//                                                  portanto ele se deslocou (q+1)-(p+1) = (q-p) posições.		
+			//  0   1     q-p        0   1    r-q-1             Ao dividirmos os vetores em dois vetores ordenados, 
+			// [1] [3] .. [5]  <->  [2] [4] .. [6]              o da esquerda está na ordem correta, portanto,
+			//                                                  movimentamos (desinvertemos) apenas os elementos que	
+			//   p  p+1 ..  q  q+1 q+2 ..  r                    estão no vetor da direita. De forma que o número total		
+			//  [1] [2] .. [3] [4] [5] .. [6]                   inversões será o quanto o elemento se deslocou em relação
+			//                                                  à sua posição original.		 
 			
 			(*t) += ((k+q+1) - i);
 			v[i] = w[k++];
