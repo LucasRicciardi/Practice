@@ -1,3 +1,5 @@
+// https://www.urionlinejudge.com.br/judge/pt/problems/view/1112
+
 #include <cstdio>
 #include <algorithm>
 
@@ -11,11 +13,11 @@ public:
 	
 	void zero(int x, int y)
 	{
-		xSize = x; ySize = y;
+		this->xSize = x; this->ySize = y;
 
-		for (int i = 1; i <= this->xSize; i++)
+		for (int i = 0; i <= this->xSize; i++)
 			for (int j = 0; j <= this->ySize; j++)
-				v[i][j] = 0;
+				this->v[i][j] = 0;
 	}
 
 	void update(int x, int y, int value)
@@ -60,7 +62,7 @@ int main(int argc, char const *argv[])
 	while (true)
 	{
 		int x, y, p; scanf("%d %d %d%*c", &x, &y, &p);
-		if (not (x+y+p)) { return 0; }
+		if (not (x | y | p)) { return 0; }
 
 		b.zero(x, y);
 
@@ -83,6 +85,7 @@ int main(int argc, char const *argv[])
 				printf("%d\n", b.query(n, m, l, o));
 			}
 		}
+
 		putchar('\n');
 	}
 
