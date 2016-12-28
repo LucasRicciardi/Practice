@@ -77,12 +77,12 @@ int main(int argc, char const *argv[])
 		//                                Adiciona o input à fila (res).
 		//                        Se sim:
 		//                                Adiciona o input ao buffer.
-        //          Se não está vazio:
-        //                 Verifica se o input é igual ao valor do buffer:
-        //                        Se não:
-        //                                Esvazia o buffer e retorna ao passo 2.
-        //                        Se sim:
-        //                                Incrementa o tamanho do buffer.  
+		//          Se não está vazio:
+		//                 Verifica se o input é igual ao valor do buffer:
+		//                        Se não:
+		//                                Esvazia o buffer e retorna ao passo 2.
+		//                        Se sim:
+		//                                Incrementa o tamanho do buffer.  
 
 		if (not buffer.empty()) { buffer.erase(res); }   // Ao final, esvazia o buffer caso ainda não esteja vazio.
 
