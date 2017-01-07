@@ -15,7 +15,7 @@ bool findSum(int const * const& v, int n, int k)
 
     // Se o valor do elemento for maior do que o da soma, retira ele.
     if (v[n-1] > k) { return findSum(v, n-1, k); }
-
+    
     // Ou o elemento está presente no conjunto COMPLETO,
     // ou ele está presente em algum subconjunto, neste caso,
     // basta chamar a função para um conjunto sem o elemento atual.
@@ -40,17 +40,17 @@ bool dfs(int const * const& v, int const& n, int const& k) // (dynamic find sum)
     // Começando a partir da posição s[1][1], verifica-se se aquele subconjunto (v[0] .. v[i])
     // pode somar até o valor j. Caso sim, recebe o valor true, e false caso contrário.
     for (int i = 1; i <= n; i++)
-    {
-        for (int j = 1; j <= k; j++)
-        {                                                   
-            s[i][j] = s[i-1][j];                            // O valor básico é o valor da posição de cima.           
-            if (j >= v[i-1])                                // Se o valor de v[i-1] for menor do que o de j, então
-            {                                               // o valor dessa posição será true caso a posição acima
-                s[i][j] = s[i][j] or s[i-1][j - v[i-1]];    // seja true ou caso o valor da linha de cima, recuando-se
-            }                                               // v[i-1] posições, seja true.
-        }                                                   // A observação é que, como os vetores são indexados de 0..n,
-    }                                                       // então temos que voltar uma posição. Assim a linha i da matriz
-                                                            // corresponde à posição i-1 do vetor original.
+    {                                                       // O valor básico é o valor da posição de cima.
+        for (int j = 1; j <= k; j++)                        // Se o valor de v[i-1] for menor do que o de j, então
+        {                                                   // o valor dessa posição será true caso a posição acima
+            s[i][j] = s[i-1][j];                            // seja true ou caso o valor da linha de cima, recuando-se           
+            if (j >= v[i-1])                                // v[i-1] posições, seja true.
+            {                                               // A observação é que, como os vetores são indexados de 0..n-1,
+                s[i][j] = s[i][j] or s[i-1][j - v[i-1]];    // então temos que voltar uma posição. Assim a linha i da matriz
+            }                                               // corresponde à posição i-1 do vetor original.
+        }                                                   
+    }                                                       
+                                                            
     #ifndef ONLINE_JUDGE
     printf("\n");
     for (int i = 0; i <= n; i++)
@@ -84,7 +84,7 @@ int main()
 
         if (dfs(v, r, k)) { printf("S\n"); }
         else              { printf("N\n"); }
-    }   
+    }
 
     return 0;
 }
