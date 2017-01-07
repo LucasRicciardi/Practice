@@ -1,5 +1,5 @@
 # Practice !
-### Repositório com alguns exercícios de programação resolvidos. Não abra caso ainda não tenha tentado resolver !!.
+### Repositório com alguns exercícios de programação resolvidos. Não abra caso ainda não tenha tentado resolver !!
 ### Repository with some solved programming exercises. Do not open if you have not tried to solve by yourself !!
 
 > Treinar o README também faz parte kkk
