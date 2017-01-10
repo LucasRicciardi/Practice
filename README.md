@@ -11,7 +11,7 @@ Estes exercícios podem vir de livros, OnlineJudges ou etc. Cada exercício ser�
 Aos interessados na resolução, eu tento deixar os código comentados com explicações sobre como chegar à solução,
 portanto, caso não tenha interesse em "colar", sugiro que não abra nenhum dos códidos.
 **Nem todos os códigos estão comentados.**
-Agradeço à aqueles que me enviarem feedbacks construtivos !
+Agradeço àqueles que me enviarem feedbacks construtivos !
 
 ### En:
 These exercises can come from books, Online Judges or etc. Each exercise will be referenced.
