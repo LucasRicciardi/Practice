@@ -54,7 +54,7 @@ int main()
 				if (a.x > b.x)
 				{
 					if      ((a.y - b.y) == 2) { w[i][0] = std::max(w[i][0], w[j][1] + 1); }
-					else if ((b.y - a.y) == 2) { w[i][1] = std::max(w[i][1], w[j][0] + 1); }}
+					else if ((b.y - a.y) == 2) { w[i][1] = std::max(w[i][1], w[j][0] + 1); }
 
 					// Aqui dividimos o problema em duas vertentes, visto que o enunciado diz sua coordenadas y devem
 					// ser na forma a-1, ou a+1. Então, para cada valor p[i].y, buscamos algum valor p[j].y	tal que 
