@@ -5,15 +5,15 @@
 
 #include <vector>
 
-// Seja n o número de casos de teste,
+// Seja n o nÃºmero de casos de teste,
 int n;
 
-// t o número de varetas e k o número da bola
+// t o nÃºmero de varetas e k o nÃºmero da bola
 // a ser adicionada.
 int t, k;
 
 // Como temos 1 <= t <= 50, e cada vareta pode
-// conter um número (ainda) indeterminado de elementos,
+// conter um nÃºmero (ainda) indeterminado de elementos,
 // cria-se uma matriz para representar as varetas 
 // e as bolas nela suportada.
 std::vector<int> v[50];
@@ -26,31 +26,31 @@ int main()
 		scanf("%d", &t);
 		
 		// Retiramos as bolas de cada elemento a cada vez.
-		// Esta passo pode ser retirado e as soluções de casos anteriores
-		// podem ser usadas para encontrar próximas soluções (memoização).
+		// Esta passo pode ser retirado e as soluÃ§Ãµes de casos anteriores
+		// podem ser usadas para encontrar prÃ³ximas soluÃ§Ãµes (memoizaÃ§Ã£o).
 		for (int i = 0; i < 50; i++) { v[i].clear(); }
 		
-		// O caso base é quando temos apenas uma vareta, nesta caso ele só pode
-		// conter uma bola, a de #1. Portanto adicionamos a bola de #1 à primeira vareta
-		// e começamos a procurar posições a partir da bola #2.
+		// O caso base Ã© quando temos apenas uma vareta, nesta caso ele sÃ³ pode
+		// conter uma bola, a de #1. Portanto adicionamos a bola de #1 Ã  primeira vareta
+		// e comeÃ§amos a procurar posiÃ§Ãµes a partir da bola #2.
 		v[0].push_back(1);
 		k = 2;
 		for (int i = 2; i <= t; i++)
 		{	
 			// Ao analisar o problema, percebemos que para cada vareta, 
-			// o maior quadrado perfeito a ser encontrado é igual ao quadrado
-			// do número de varetas. Assim para t = 2, o maior quadrado perfeito
-			// a ser encontrado pelas regras é 4.
+			// o maior quadrado perfeito a ser encontrado Ã© igual ao quadrado
+			// do nÃºmero de varetas. Assim para t = 2, o maior quadrado perfeito
+			// a ser encontrado pelas regras Ã© 4.
 			// Portanto, para cada caso, buscamos o elemento em que k mais o elemento do topo
-			// da pilha seja igual ao número de varetas ao quadrado, ou seja,
-			// k + v.back() = i²		
+			// da pilha seja igual ao nÃºmero de varetas ao quadrado, ou seja,
+			// k + v.back() = iÂ²		
 			int square = i * i;		
 			bool condition = true;
 			
-			// Buscamos para cada valor de i a melhor solução, até i = t.
-			// Sabemos que encontramos a melhor solução para determinada pilha
-			// quando ao percorrermos ela, não encontrarmos valor que satisfaça a equação acima.
-			// Assim, adicionamos a próxima vareta.
+			// Buscamos para cada valor de i a melhor soluÃ§Ã£o, atÃ© i = t.
+			// Sabemos que encontramos a melhor soluÃ§Ã£o para determinada pilha
+			// quando ao percorrermos ela, nÃ£o encontrarmos valor que satisfaÃ§a a equaÃ§Ã£o acima.
+			// Assim, adicionamos a prÃ³xima vareta.
 			while (condition)
 			{
 				condition = false;
@@ -70,7 +70,7 @@ int main()
 			}
 		}		
 		
-		// Como começamos a contar a partir de 1, o # de bolas será igual a k-1.
+		// Como comeÃ§amos a contar a partir de 1, o # de bolas serÃ¡ igual a k-1.
 		printf("%d\n", k-1);
 	}
 	
