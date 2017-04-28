@@ -112,7 +112,10 @@ public:
     //  que se forem feitas n chamadas e o estado inicial for zero, o valor do estado
     //  será de n*i, onde i é a unidade de incremento. Pode ser descrita como:
     //  d(qi, a) = d((qi + i), e), onde e é um valor opcional de saída. 
-    int proximoValor(int entrada, int posicao, float ** saida) { return ++estado; }
+    int proximoValor(int entrada, int posicao, float ** saida)
+    { 
+    	return saida[posicao][0] = ++estado; 
+    }
 
     inline int estadoInicial() const { return estadoInicial_; }
 
@@ -161,9 +164,8 @@ public:
     //  estado atual será a entrada. Pode ser descrita como:
     //  d(qi, a) = (a, ((qi + a) / 2))
     int proximoValor(int entrada, int posicao, float ** saida)
-    {
-        saida[posicao][0] = (estado / 2) + (entrada / 2);
-        return entrada;
+    {       
+        return (saida[posicao][0] = (estado / 2) + (entrada / 2), entrada);
     }
 
     int estadoInicial() { return   estadoInicial_; }
@@ -184,11 +186,9 @@ public:
     //  d(qi, a) = (a, qi)
     int proximoValor(int entrada, int posicao, float ** saida)
     {
-        // A saída atual é o estado anterior.
-        saida[posicao][0] = estado;
-
-        // Atualiza o estado atual para a última entrada recebida.
-        return entrada;
+        // A saída atual é o estado anterior e então
+        // atualiza o estado atual para a última entrada recebida.
+        return (saida[posicao][0] = estado, entrada);
     }
 
     inline int estadoInicial() const { return estadoInicial_; }
