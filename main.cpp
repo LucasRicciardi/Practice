@@ -168,8 +168,8 @@ public:
         return (saida[posicao][0] = (estado / 2) + (entrada / 2), entrada);
     }
 
-    int estadoInicial() { return   estadoInicial_; }
-    void reset()        { estado = estadoInicial_; }
+    int estadoInicial() { return estadoInicial_; }
+    void reset() { estado = estadoInicial_; }
 };
 
 class Delay: public MaquinaEstado
@@ -287,8 +287,8 @@ public:
     m2(m2_),
     estadoInicial_(es)
     {
-        this->estado = es;
-        this->name = "Cascade";
+        estado = es;
+        name = "Cascade";
     } 
 
     ~Cascade()
@@ -335,14 +335,15 @@ public:
     m2(m2_),
     estadoInicial_(es)
     {
-        this->estado = es;
-        this->name = "Paralelo";
+        estado = es;
+        name = "Paralelo";
     } 
 
     ~Paralelo()
     {
         delete m1;
         m1 = NULL;
+        
         delete m2;
         m2 = NULL;
     }
