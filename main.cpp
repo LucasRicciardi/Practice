@@ -27,7 +27,7 @@ private:
 
     Output step(Input const& input)
     {
-        std::pair<State, Output> const& res = getNextValues(this->state_, input);        
+        std::pair<State, Output> const& res = this->getNextValues(this->state_, input);        
         return (this->state_ = res.first, res.second);
     }
 
