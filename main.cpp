@@ -99,6 +99,8 @@ public:
     }
 };
 #undef State
+#undef SubState
+#undef Output
 
 #define State std::pair<double, double>
 #define Output double
@@ -128,6 +130,7 @@ public:
     }
 };
 #undef State
+#undef Output
 
 #define A double
 #define B double
