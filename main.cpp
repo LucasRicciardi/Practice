@@ -87,6 +87,15 @@ public:
 
     }
 
+    ~Cascade()
+    {
+        delete m1;
+        m1 = nullptr;
+
+        delete m2;
+        m2 = nullptr;
+    }
+
     Cascade(Cascade const&) = delete;
     Cascade(Cascade&&) = delete;
     Cascade& operator=(Cascade) = delete;
@@ -119,6 +128,12 @@ public:
     m(sm)
     {
         // Feedback
+    }
+
+    ~Feedback()
+    {
+        delete m;
+        m = nullptr;
     }
 
     Feedback(Feedback const&) = delete;
