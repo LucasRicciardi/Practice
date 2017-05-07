@@ -3,6 +3,9 @@
 //      Lucas Ricciardi de Salles
 //      Matheus de Almeida Souza 
 
+// Requer: C++ 11
+// g++ maquina_estado_planta_controlador.cpp -o maquina_estado_planta_controlador -std=c++11
+
 #include <iostream>
 #include <vector>
 #include <algorithm>
