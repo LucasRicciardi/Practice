@@ -179,7 +179,7 @@ public:
 
     std::pair<A, B> getNextValues(A const& t, Input const& n)
     {
-        return {t - dt * n, t };
+        return { t - dt * n, t };
     }
 };
 #undef A
@@ -199,7 +199,7 @@ void show_output(std::vector<T> v)
 int main()
 {
     std::vector<Input> v;
-    for (int i = 0; i ++< 30; v.push_back((double)i));
+    for (int i = 0; i++ < 30; v.push_back((double) i));
 
     Feedback robot(
         new Cascade(
