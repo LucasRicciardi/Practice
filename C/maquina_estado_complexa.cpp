@@ -1,5 +1,5 @@
 //       Nome: Lucas Ricciardi de Salles
-//    Assunto: Máquinas de Estado
+//    Assunto: Máquinas de Estado II
 // Disciplina: Programação Orientada à Objetos
 //       Prof: Maurício Marengoni
 
@@ -21,7 +21,7 @@ public:
     // Params:
     //    int entrada -> Inteiro representando um valor de entrada.
     //    int posicao -> Posição que o valor de saída deve estar no vetor de saída.
-    // float ** saida -> Vetor de 'floats' para registrar a saída na posição 'posicao'. 
+    // float ** saida -> Vetor de 'floats' para registrar a saída na posição 'posicao'.
     // Descrição:
     //  Esta função realiza um processo na máquina e atualiza o estado atuaç dela 
     //  ao final do processo.
@@ -61,7 +61,7 @@ public:
     }
 
     // Funções à serem sobreescritas em classes que herdam de 'MaquinaEstado'.
-    
+
     // Params:
     //    int entrada -> Inteiro representando um valor de entrada.
     //    int posicao -> Posição que o valor de saída deve estar no vetor de saída.
@@ -70,7 +70,7 @@ public:
     //  Esta função representa a 'função' da máquina e, portanto, varia para cada 
     //  diferente implementação da mesma.
     virtual int proximoValor(int entrada, int posicao, float ** saida) { return 0; }
-    
+
     // Descrição:
     //  Retorna a máquina ao seu estado inicial.
     virtual int estadoInicial() const { return 0; }
@@ -168,8 +168,9 @@ public:
         return (saida[posicao][0] = (estado / 2) + (entrada / 2), entrada);
     }
 
-    int estadoInicial() { return estadoInicial_; }
-    void reset() { estado = estadoInicial_; }
+    inline int estadoInicial() const { return estadoInicial_; }
+    
+    inline void reset() { estado = estadoInicial_; }
 };
 
 class Delay: public MaquinaEstado
@@ -317,8 +318,9 @@ public:
         );
     }
 
-    int estadoInicial() const { return this->estadoInicial_; }
-    void reset() { estado = estadoInicial_; }
+    inline int estadoInicial() const { return estadoInicial_; }
+    
+    inline void reset() { estado = estadoInicial_; }
 };
 
 class Paralelo: public MaquinaEstado
@@ -362,54 +364,55 @@ public:
         );
     }
 
-    int estadoInicial() const { return this->estadoInicial_; }
-    void reset() { estado = estadoInicial_; }
+    inline int estadoInicial() const { return estadoInicial_; }
+    
+    inline void reset() { estado = estadoInicial_; }
 };
 
 // Main com exemplos de uso e algumas combinações
 int main()
 {
     float ** saida = new float * [10];
-    int * entrada = new int[10]; 
-    int tamanho_vetor = 10;
+    int * entrada = new int [10];
+    int tamanho = 10;
 
     // Porta automática que conta quantas pessoas passaram
     Cascade porta_automatica(new Porta, new Incrementador);
-    for (int i = 0; i < tamanho_vetor; i++)
-    { 
-        entrada[i] = ::rand() % 2; 
+    for (int i = 0; i < tamanho; i++)
+    {
+        entrada[i] = ::rand() % 2;
         saida[i] = new float[10];
     }
-    porta_automatica.transdutor(entrada, tamanho_vetor, saida);
+    porta_automatica.transdutor(entrada, tamanho, saida);
     porta_automatica.imprime();
 
     // Objeto que acumula valores e conta quantos objetos inteiros foram acumulados
     Paralelo acumulador_incrementador(new Acumulador, new Incrementador);
-    for (int i = 0; i < tamanho_vetor; i++)
+    for (int i = 0; i < tamanho; i++)
     {
         entrada[i] = ::rand() % 100;
     }
-    acumulador_incrementador.transdutor(entrada, tamanho_vetor, saida);
+    acumulador_incrementador.transdutor(entrada, tamanho, saida);
     acumulador_incrementador.imprime();
 
     // Trilho que move-se para esquerda ou para direita de acordo com o input e armazena a posição atual
     Cascade trilhos(new UpDown, new Delay);
-    for (int i = 0; i < tamanho_vetor; i++)
+    for (int i = 0; i < tamanho; i++)
     {
         entrada[i] *= i & 2 ? -1: 1;
     }
-    trilhos.transdutor(entrada, tamanho_vetor, saida);
+    trilhos.transdutor(entrada, tamanho, saida);
     trilhos.imprime();
 
     // Objeto formado por duas máquinas complexas
     Paralelo objeto_complexo(
-        new Cascade(new Incrementador, new Media2), 
+        new Cascade(new Incrementador, new Media2),
         new Paralelo(new Delay, new UpDown)
         );
-    objeto_complexo.transdutor(entrada, tamanho_vetor, saida);
+    objeto_complexo.transdutor(entrada, tamanho, saida);
     objeto_complexo.imprime();
 
-    for (int i = 0; i < tamanho_vetor; i++) { delete saida[i]; }
-    delete saida;
-    delete entrada;
+    for (int i = 0; i < tamanho; i++) { delete[] saida[i]; }
+    delete[] saida;
+    delete[] entrada;
 }

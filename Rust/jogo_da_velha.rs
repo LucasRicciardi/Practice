@@ -94,7 +94,7 @@ fn new_game()
         
         let v: Vec<u32> = s.split(" ")
             .map(|x: &str| x.trim().parse::<u32>()
-                    .expect("Falha ao converter o para inteiro !"))
+                    .expect("Falha ao converter para inteiro !"))
             .collect();
 
         let row: usize = v[0] as usize;
@@ -162,6 +162,5 @@ fn main()
             _ => { again = false },
         }
     } 
-
     println!("\nObrigado por jogar !");
 }
