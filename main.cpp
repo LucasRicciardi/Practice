@@ -83,7 +83,8 @@ public:
     StateMachine( { sm1->getState(), sm2->getState() }),
     m1(sm1),
     m2(sm2)
-    {        
+    {
+
     }
 
     Cascade(Cascade const&) = delete;
@@ -107,27 +108,27 @@ public:
 
 #define State std::pair<double, double>
 #define Output double
-class Feedback: public StateMachine< State, Output>
+class Feedback: public StateMachine<State, Output>
 {
 private:
-    StateMachine< State, Output > * m;
+    StateMachine<State, Output> * m;
 
 public:
-    Feedback(StateMachine< State, Output > * sm):
+    Feedback(StateMachine<State, Output> * sm):
     StateMachine(sm->getState()),
     m(sm)
     {
-
+        // Feedback
     }
 
     Feedback(Feedback const&) = delete;
     Feedback(Feedback&&) = delete;
     Feedback& operator=(Feedback) = delete;
 
-    std::pair< State, Output > getNextValues(State const& state, Input const& input)
+    std::pair<State, Output> getNextValues(State const& state, Input const& input)
     {   
-        std::pair< State, Output > const& r1 = m->getNextValues(state, input);
-        std::pair< State, Output > const& r2 = m->getNextValues(state, r1.second);
+        std::pair<State, Output> const& r1 = m->getNextValues(state, input);
+        std::pair<State, Output> const& r2 = m->getNextValues(state, r1.second);
         
         return { r2.first, r1.second }; 
     }
@@ -144,12 +145,12 @@ private:
     const A d;
 
 public:
-    WallController(A k_ = -1.5f, A d_ = 1.0f):
-    StateMachine(0),
+    WallController(A k_ = -1.5f, A d_ = 1.0f, A state = 0.0f):
+    StateMachine(state),
     k(k_),
     d(d_)
     {
-
+        // WallController
     }
 
     std::pair<A, B> getNextValues(A const&, Input const& dt)
@@ -169,8 +170,8 @@ private:
     const A dt;
 
 public:
-    WallWorld(A dt_ = 0.1f):
-    StateMachine(5.0f),
+    WallWorld(A dt_ = 0.1f, A state = 5.0f):
+    StateMachine(state),
     dt(dt_)
     {
         // WallWorld
