@@ -1,207 +1,378 @@
-// Nomes:
-//      Felipe Oliveira Bueno
-//      Lucas Ricciardi de Salles
-//      Matheus de Almeida Souza 
-
-// Requer: C++ 11
-// g++ maquina_estado_planta_controlador.cpp -o maquina_estado_planta_controlador -std=c++11
-
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <functional>
+#include <memory>
+#include <cassert>
+#include <cstdint>
 
-#define Input double
-
-template <class State, class Output>
+template <class State, class Output, class Input>
 class StateMachine
 {
 protected:
     State state_;
-    const State start_state;
+    const State first_state_;
 
 private:
-    void start()
-    {
-        this->state_ = this->start_state;
-    }
+    void start() { this->state_ = this->first_state_; }
 
-    Output step(Input const& input)
+public:    
+    StateMachine(State state):
+    state_(state),
+    first_state_(state)
     {
-        std::pair<State, Output> const& res = this->getNextValues(this->state_, input);        
-        return (this->state_ = res.first, res.second);
-    }
 
-public:
-    StateMachine(State s):
-    state_(s),
-    start_state(s)
-    {
-        // Máquina de Estado
     }
 
     virtual ~StateMachine()
     {
-        // Destrutor
+
     }
 
-    State getState() const { return this->state_; }
-
-    std::vector<Output> transduce(std::vector<Input> const& input)
+    std::vector<Output> transduce(std::vector<Input> const& input, 
+        std::function<std::pair<State, Output>(State const&, Input const&)> foo = nullptr)
     {
         this->start();
-        std::vector<Output> output;
-        std::for_each(input.begin(), input.end(), [&] (Input const& x)
+        std::vector<Output> output(input.size());
+        uint64_t i = 0;
+        std::for_each(input.begin(), input.end(), [&] (Input const& input_)
         {
-            Output res = this->step(x);
-            output.push_back(res);
+            std::pair<State, Output> const& r =
+                foo ? foo(this->state(), input_) : this->nextValue(this->state(), input_);
+            this->state_ = r.first;
+            output.at(i++) = r.second;
         });
         return output;
     }
 
-    virtual State getNextState(State const& state, Input const& /* input */ )
+    virtual std::pair<State, Output> nextValue(State const& /* state */, Input const& /* input */)
     {
-        return state;
+        return  { this->state() , Output() };
     }
 
-    virtual std::pair<State, Output> getNextValues(State const& state , Input const& input ) 
-    { 
-        return { this->getNextState(state, input), Output() }; 
+    State state() const { return this->state_; }
+};
+
+// ###################################################################
+// # Acumulador
+// ###################################################################
+
+class Accumulator:
+    public StateMachine<double, double, double>
+{
+    using State = double;
+    using Output = double;
+    using Input = double;
+
+public:
+    Accumulator(State state):
+    StateMachine<State, Output, Input>(state)
+    {
+
+    }
+
+    std::pair<State, Output> nextValue(State const& state, Input const& input)
+    {
+        return { state + input, state + input };
     }
 };
 
-#define State std::pair<double, double>
-#define SubState double 
-#define Output double
-class Cascade: public StateMachine<State, Output>
+// ###################################################################
+// # Incrementador
+// ###################################################################
+
+class Incrementer:
+    public StateMachine<double, double, double>
 {
-private:
-    StateMachine<SubState, Output> * m1;
-    StateMachine<SubState, Output> * m2;
+    using State = double;
+    using Output = double;
+    using Input = double;
 
 public:
-    Cascade(StateMachine<SubState, Output> * sm1, StateMachine<SubState, Output> * sm2):
-    StateMachine( { sm1->getState(), sm2->getState() }),
-    m1(sm1),
-    m2(sm2)
+    Incrementer(State state):
+    StateMachine<State, Output, Input>(state)
     {
 
     }
 
-    ~Cascade()
+    std::pair<State, Output> nextValue(State const& state, Input const& /* input */ )
     {
-        delete m1;
-        m1 = nullptr;
+        return { state + 1, state + 1 };
+    }      
+};
 
-        delete m2;
-        m2 = nullptr;
+// ###################################################################
+// # UpDown
+// ###################################################################
+
+class UpDown: public StateMachine<double, double, double>
+{
+    using State = double;
+    using Output = double;
+    using Input = double;
+
+public:
+    UpDown(State state = 0):
+    StateMachine<State, Output, Input>(state)
+    {
+
     }
 
-    Cascade(Cascade const&) = delete;
-    Cascade(Cascade&&) = delete;
-    Cascade& operator=(Cascade) = delete;
+    std::pair<State, Output> nextValue(State const& state, Input const& input)
+    {   
+        if (0 <= input)
+        {
+            return { state + 1, state + 1 };
+        }
+        else
+        {
+            return { state - 1, state - 1 };
+        }
+    }
+};
 
-    std::pair<State, Output> getNextValues(State const& state, Input const& input)
+// ###################################################################
+// # Média2
+// ###################################################################
+
+class Average2:
+    public StateMachine<double, double, double>
+{
+    using State = double;
+    using Output = double;
+    using Input = double;
+
+public:
+    Average2(State state = 0):
+    StateMachine<State, Output, Input>(state)
     {
-        std::pair<SubState, Output> const& r1 = m1->getNextValues(state.first, input);
-        std::pair<SubState, Output> const& r2 = m2->getNextValues(state.second, r1.second);
-        return 
+
+    }
+
+    std::pair<State, Output> nextValue(State const& state, Input const& input)
+    {   
+        return { input, state + (input - state) / 2 };
+    }
+};
+
+// ###################################################################
+// # Delay
+// ###################################################################
+
+class Delay:
+    public StateMachine<double, double, double>
+{
+    using State = double;
+    using Output = double;
+    using Input = double;
+
+public:
+    Delay(State state = 0):
+    StateMachine<State, Output, Input>(state)
+    {
+
+    }
+
+    std::pair<State, Output> nextValue(State const& state, Input const& input)
+    {   
+        return { input, state };
+    }
+};
+
+// ###################################################################
+// # Cascade
+// ###################################################################
+
+#define CompositeState std::pair<double, double>    
+class Cascade: 
+    public StateMachine< CompositeState, double, double>
+{
+    using State1 = double;
+    using State2 = double;
+    using Output = double;
+    using Input = double;
+    using Bridge = double;
+
+private:
+    #define Machine1 StateMachine<State1, Bridge, Input>
+    #define Machine2 StateMachine<State2, Output, Bridge>
+
+    std::unique_ptr<Machine1> m1;
+    std::unique_ptr<Machine2> m2;
+
+public:
+    Cascade(Machine1 * sm1, Machine2 * sm2):
+    StateMachine<CompositeState, Output, Input>({ sm1->state(), sm2->state() }),
+    m1(std::move(sm1)),
+    m2(std::move(sm2))
+    {   
+        assert(sm1 != nullptr);
+        assert(sm2 != nullptr);
+    }
+
+    std::pair<CompositeState, Output> nextValue(CompositeState const& state, Input const& input)
+    {
+        std::pair<State1, Bridge> const& r1 = this->m1->nextValue(state.first, input);
+        std::pair<State2, Output> const& r2 = this->m2->nextValue(state.second, r1.second);
+        return
         {
             { r1.first, r2.first },
-            r2.second
+            { r2.second }
         };
     }
 };
-#undef State
-#undef SubState
-#undef Output
+#undef Machine2
+#undef Machine1
+#undef CompositeState
 
-#define State std::pair<double, double>
-#define Output double
-class Feedback: public StateMachine<State, Output>
+// ###################################################################
+// # Paralelo
+// ###################################################################
+
+#define CompositeState std::pair<double, double>
+#define CompositeOutput std::pair<double, double>
+class Parallel:
+    public StateMachine< CompositeState, CompositeOutput, double>
 {
+    using State = double;    
+    using Output = double;
+    using Input = double;
+
 private:
-    StateMachine<State, Output> * m;
+    #define Machine StateMachine<State, Output, Input>
+    
+    std::unique_ptr<Machine> m1;
+    std::unique_ptr<Machine> m2;
 
 public:
-    Feedback(StateMachine<State, Output> * sm):
-    StateMachine(sm->getState()),
-    m(sm)
+    Parallel(Machine * sm1, Machine * sm2):
+    StateMachine<CompositeState, CompositeOutput, Input>({ sm1->state(), sm2->state() }),
+    m1(std::move(sm1)),
+    m2(std::move(sm2))
     {
-        // Feedback
+        assert(sm1 != nullptr);
+        assert(sm2 != nullptr);
     }
 
-    ~Feedback()
+    std::pair<CompositeState, CompositeOutput> nextValue(CompositeState const& state, Input const& input)
     {
-        delete m;
-        m = nullptr;
-    }
-
-    Feedback(Feedback const&) = delete;
-    Feedback(Feedback&&) = delete;
-    Feedback& operator=(Feedback) = delete;
-
-    std::pair<State, Output> getNextValues(State const& state, Input const& input)
-    {   
-        std::pair<State, Output> const& r1 = m->getNextValues(state, input);
-        std::pair<State, Output> const& r2 = m->getNextValues(state, r1.second);
-        
-        return { r2.first, r1.second }; 
+        std::pair<State, Output> const& r1 = this->m1->nextValue(state.first, input);
+        std::pair<State, Output> const& r2 = this->m2->nextValue(state.second, input);
+        return
+        {
+            { r1.first, r2.first },
+            { r1.second, r2.second }
+        };
     }
 };
-#undef State
-#undef Output
+#undef Machine
+#undef CompositeOutput
+#undef CompositeState
 
-#define A double
-#define B double
-class WallController:  public StateMachine<A, B>
+// ###################################################################
+// # Feedback
+// ###################################################################
+
+#define CompositeState std::pair<double, double>
+class Feedback:
+    public StateMachine<CompositeState, double, double>
 {
+    using State = CompositeState;
+    using Output = double;
+    using Input = double;
+
 private:
-    const A k;
-    const A d;
+    #define Machine StateMachine<State, Output, Input>
+        std::unique_ptr< Machine > m;
+    #undef Machine
 
 public:
-    WallController(A k_ = -1.5f, A d_ = 1.0f, A state = 0.0f):
-    StateMachine(state),
-    k(k_),
-    d(d_)
+    Feedback(StateMachine<State, Output, Input> * sm):
+    StateMachine<State, Output, Input>(sm->state()),
+    m(std::move(sm))
     {
-        // WallController
+        assert(sm != nullptr);
     }
 
-    std::pair<A, B> getNextValues(A const&, Input const& dt)
+    std::pair<State, Output> nextValue(State const& state, Input const& input)
     {
-        A res = k * (d - dt);
+        std::pair<State, Output> const& r1 = this->m->nextValue(state, input);
+        std::pair<State, Output> const& r2 = this->m->nextValue(state, r1.second);
+
+        return { r2.first, r1.second };
+    }
+};
+#undef CompositeState
+
+// ###################################################################
+// # WallController
+// ###################################################################
+
+class WallController:
+    public StateMachine<double, double, double>
+{
+    using State = double;
+    using Output = double;
+    using Input = double;
+
+    using Constant = const double;
+
+private:
+    Constant k;
+    Constant d;
+
+public:
+    WallController(Constant k_ = -1.5f, Constant d_ = 1.0f, State state = 0.0f):
+    StateMachine<double, double, double>(state),
+    k(k_),
+    d(d_)
+    {   
+        assert(("k deve ser MENOR do que zero !", k < 0));
+    }
+
+    std::pair<State, Output> nextValue(State const&, Input const& dt)
+    {
+        Output res = k * (d - dt);
         return { res, res };
     }
 };
-#undef A
-#undef B
 
-#define A double
-#define B double
-class WallWorld: public StateMachine<A, B>
+// ###################################################################
+// # WallController
+// ###################################################################
+
+class WallWorld:
+    public StateMachine<double, double, double>
 {
+    using State = double;
+    using Output = double;
+    using Input = double;
+
+    using Constant = const double;
+
 private:
-    const A dt;
+    Constant dt;
 
 public:
-    WallWorld(A dt_ = 0.1f, A state = 5.0f):
-    StateMachine(state),
+    WallWorld(Constant dt_ = 0.1f, State state = 5.0f):
+    StateMachine<double, double, double>(state),
     dt(dt_)
     {
-        // WallWorld
+        assert(dt > 0);
     }
 
-    std::pair<A, B> getNextValues(A const& t, Input const& n)
+    std::pair<State, Output> nextValue(State const& t, Input const& n)
     {
         return { t - dt * n, t };
     }
 };
-#undef A
-#undef B
 
-template <typename T>
-void show_output(std::vector<T> v)
+// ###################################################################
+// # Main
+// ###################################################################
+
+template<typename T>
+void show_output(std::vector<T> const& v)
 {
     std::cout << std::endl;
     std::for_each(v.begin(), v.end(), [] (T const& t)
@@ -213,15 +384,15 @@ void show_output(std::vector<T> v)
 
 int main()
 {
-    std::vector<Input> v;
-    for (int i = 0; i++ < 30; v.push_back((double) i));
+    std::vector<double> v(30);
+    for (uint32_t i = 0; i < v.size(); v.at(i) = i++ & 2 ? ::rand() : -1 * ::rand());
 
     Feedback robot(
         new Cascade(
             new WallController, new WallWorld
             )
         );
-    show_output(robot.transduce(v));
-
+    show_output(robot.transduce(v));   
+    
     return 0;
 }
