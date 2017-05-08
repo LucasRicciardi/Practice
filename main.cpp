@@ -66,7 +66,7 @@ class Accumulator:
 
 public:
     Accumulator(State state):
-    StateMachine<State, Output, Input>(state)
+    StateMachine(state)
     {
 
     }
@@ -90,7 +90,7 @@ class Incrementer:
 
 public:
     Incrementer(State state):
-    StateMachine<State, Output, Input>(state)
+    StateMachine(state)
     {
 
     }
@@ -105,7 +105,8 @@ public:
 // # UpDown
 // ###################################################################
 
-class UpDown: public StateMachine<double, double, double>
+class UpDown: 
+    public StateMachine<double, double, double>
 {
     using State = double;
     using Output = double;
@@ -113,7 +114,7 @@ class UpDown: public StateMachine<double, double, double>
 
 public:
     UpDown(State state = 0):
-    StateMachine<State, Output, Input>(state)
+    StateMachine(state)
     {
 
     }
@@ -144,7 +145,7 @@ class Average2:
 
 public:
     Average2(State state = 0):
-    StateMachine<State, Output, Input>(state)
+    StateMachine(state)
     {
 
     }
@@ -168,7 +169,7 @@ class Delay:
 
 public:
     Delay(State state = 0):
-    StateMachine<State, Output, Input>(state)
+    StateMachine(state)
     {
 
     }
@@ -184,6 +185,9 @@ public:
 // ###################################################################
 
 #define CompositeState std::pair<double, double>    
+#define Machine1 StateMachine<State1, Bridge, Input>
+#define Machine2 StateMachine<State2, Output, Bridge>
+
 class Cascade: 
     public StateMachine< CompositeState, double, double>
 {
@@ -194,15 +198,12 @@ class Cascade:
     using Bridge = double;
 
 private:
-    #define Machine1 StateMachine<State1, Bridge, Input>
-    #define Machine2 StateMachine<State2, Output, Bridge>
-
     std::unique_ptr<Machine1> m1;
     std::unique_ptr<Machine2> m2;
 
 public:
     Cascade(Machine1 * sm1, Machine2 * sm2):
-    StateMachine<CompositeState, Output, Input>({ sm1->state(), sm2->state() }),
+    StateMachine({ sm1->state(), sm2->state() }),
     m1(std::move(sm1)),
     m2(std::move(sm2))
     {   
@@ -221,6 +222,7 @@ public:
         };
     }
 };
+
 #undef Machine2
 #undef Machine1
 #undef CompositeState
@@ -231,6 +233,8 @@ public:
 
 #define CompositeState std::pair<double, double>
 #define CompositeOutput std::pair<double, double>
+#define Machine StateMachine<State, Output, Input>
+
 class Parallel:
     public StateMachine< CompositeState, CompositeOutput, double>
 {
@@ -239,14 +243,12 @@ class Parallel:
     using Input = double;
 
 private:
-    #define Machine StateMachine<State, Output, Input>
-    
     std::unique_ptr<Machine> m1;
     std::unique_ptr<Machine> m2;
 
 public:
     Parallel(Machine * sm1, Machine * sm2):
-    StateMachine<CompositeState, CompositeOutput, Input>({ sm1->state(), sm2->state() }),
+    StateMachine({ sm1->state(), sm2->state() }),
     m1(std::move(sm1)),
     m2(std::move(sm2))
     {
@@ -265,6 +267,7 @@ public:
         };
     }
 };
+
 #undef Machine
 #undef CompositeOutput
 #undef CompositeState
@@ -274,6 +277,7 @@ public:
 // ###################################################################
 
 #define CompositeState std::pair<double, double>
+
 class Feedback:
     public StateMachine<CompositeState, double, double>
 {
@@ -288,7 +292,7 @@ private:
 
 public:
     Feedback(StateMachine<State, Output, Input> * sm):
-    StateMachine<State, Output, Input>(sm->state()),
+    StateMachine(sm->state()),
     m(std::move(sm))
     {
         assert(sm != nullptr);
@@ -301,6 +305,7 @@ public:
 
         return { r2.first, r1.second };
     }
+
 };
 #undef CompositeState
 
@@ -323,7 +328,7 @@ private:
 
 public:
     WallController(Constant k_ = -1.5f, Constant d_ = 1.0f, State state = 0.0f):
-    StateMachine<double, double, double>(state),
+    StateMachine(state),
     k(k_),
     d(d_)
     {   
@@ -355,7 +360,7 @@ private:
 
 public:
     WallWorld(Constant dt_ = 0.1f, State state = 5.0f):
-    StateMachine<double, double, double>(state),
+    StateMachine(state),
     dt(dt_)
     {
         assert(dt > 0);
@@ -392,7 +397,7 @@ int main()
             new WallController, new WallWorld
             )
         );
-    show_output(robot.transduce(v));   
-    
+    show_output(robot.transduce(v));
+
     return 0;
 }
