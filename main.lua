@@ -89,7 +89,6 @@ function main()
                 end
             end 
         end 
-
     end -- While
     draw_board(board, dumb)
 end

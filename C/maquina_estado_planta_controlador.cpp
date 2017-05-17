@@ -1,3 +1,5 @@
+// https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-01sc-introduction-to-electrical-engineering-and-computer-science-i-spring-2011/unit-1-software-engineering/state-machines/MIT6_01SCS11_chap04.pdf
+
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -16,7 +18,7 @@ protected:
 private:
     void start() { this->state_ = this->first_state_; }
 
-public:    
+public:
     StateMachine(State state):
     state_(state),
     first_state_(state)
@@ -26,10 +28,10 @@ public:
 
     virtual ~StateMachine()
     {
-
+        
     }
 
-    std::vector<Output> transduce(std::vector<Input> const& input, 
+    std::vector<Output> transduce(std::vector<Input> const& input,
         std::function<std::pair<State, Output>(State const&, Input const&)> foo = nullptr)
     {
         this->start();
@@ -105,7 +107,7 @@ public:
 // # UpDown
 // ###################################################################
 
-class UpDown: 
+class UpDown:
     public StateMachine<double, double, double>
 {
     using State = double;
@@ -151,7 +153,7 @@ public:
     }
 
     std::pair<State, Output> nextValue(State const& state, Input const& input)
-    {   
+    {
         return { input, state + (input - state) / 2 };
     }
 };
@@ -189,7 +191,7 @@ public:
 #define Machine2 StateMachine<State2, Output, Bridge>
 
 class Cascade: 
-    public StateMachine< CompositeState, double, double>
+    public StateMachine<CompositeState, double, double>
 {
     using State1 = double;
     using State2 = double;
@@ -236,9 +238,9 @@ public:
 #define Machine StateMachine<State, Output, Input>
 
 class Parallel:
-    public StateMachine< CompositeState, CompositeOutput, double>
+    public StateMachine<CompositeState, CompositeOutput, double>
 {
-    using State = double;    
+    using State = double;
     using Output = double;
     using Input = double;
 
@@ -307,6 +309,7 @@ public:
     }
 
 };
+
 #undef CompositeState
 
 // ###################################################################
@@ -331,7 +334,7 @@ public:
     StateMachine(state),
     k(k_),
     d(d_)
-    {   
+    {
         assert(("k deve ser MENOR do que zero !", k < 0));
     }
 
