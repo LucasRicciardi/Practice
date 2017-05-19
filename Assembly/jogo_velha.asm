@@ -40,17 +40,17 @@ section .bss
     index resb 3        ; índice da linha e da coluna
 
 section .data
-    eol db 0xa          ; fim-de-linha
-    empty db ' '        ; espaço em branco
+    eol db 0xa                                                  ; fim-de-linha
+    empty db ' '                                                ; espaço em branco
 
     choose_your_move db 0xa, 'Jogador $, faca sua jogada', 0xa  ; mensagem de escolha de jogada
     choose_your_move_len equ $ - choose_your_move               ; tamanho da mensagem de escolha de jogada
 
-    victory_    db 0xa, 'Jogador $ venceu', 0xa     ; mensagem de vitória
-    victory_len equ $ - victory_            ; tamanho da mensagem de vitória
+    victory_    db 0xa, 'Jogador $ venceu', 0xa                 ; mensagem de vitória
+    victory_len equ $ - victory_                                ; tamanho da mensagem de vitória
 
-    draw_ db 0xa, 'Empate ', 0xa    ; mensagem de empate
-    draw_len equ $ - draw_      ; tamanho da mensagem de empate
+    draw_ db 0xa, 'Empate ', 0xa                                ; mensagem de empate
+    draw_len equ $ - draw_                                      ; tamanho da mensagem de empate
 
 section .text
     global main
@@ -202,9 +202,8 @@ print_board:
     mov rcx, 3 * 3                          ; inicia o loop
     mov rbx, 0x0                            ; contador da posição atual do tabuleiro
     mov byte [index + 1], byte '1'          ; índice da linha
+    printf eol, 1                           ; imprime uma lina em branco
     print_board.print:  
-        cmp rdx, 0x0                        ; vê se está na primeira posição
-
         push rcx                            ; 'push' contador do loop   
         push rdx                            ; 'push' contador da coluna atual
 
