@@ -260,6 +260,60 @@ class Multiplex(Switch):
         else:
             return ((ns1, ns2), o2)
 
+class RotateTSM(StateMachine):
+    def __init__(self, headingDelta, state = 'start'):
+        self.headingDelta = headingDelta
+        self.rotationalGain = 3.0
+        self.angleEpsilon = 0.01
+        super(RotateTSM, self).__init__(state, 'RotateTSM')
+
+    def getNextValues(self, state, inp):
+        currentTheta = inp.odometry.theta
+        if state == 'start':
+            thetaDesired = \
+                util.fixAnglePlusMinusPi(currentTheta + self.headingDelta)
+        else:
+            (thetaDesired, thetaLast) = state
+        newState = (thetaDesired, currentTheta)
+        action = io.Action(rvel = self.rotationalGain * \
+                    util.fixAnglePlusMinusPi(thetaDesired - currentTheta))
+        return (newState, action)
+
+    def done(self, state):
+        if state == 'start':
+            return False
+        else
+            (thetaDesired, thetaLast) = state
+            return util.nearAngle(thetaDesired, thetaLast, self.angleEpsilon)
+
+class ForwardTSM(StateMachine):
+    def __init__(self, delta, state = 'start'):
+        self.deltaDesired = delta
+        self.forwardGain = 1.0
+        self.distTargetEpsilon = 0.01
+        super(ForwardTSM, self).__init__(state, 'ForwardTSM')
+
+    def getNextValues(self, state, inp):
+        currentPos = inp.odometry.point()
+        if state == 'start':
+            print('Starting forward {}'.format(self.deltaDesired))
+            startPos = currentPos
+        else:
+            (startPos, lastPos) = state
+        newState = (startPos, currentPos)
+        error = self.deltaDesired - startPos.distance(currentPos)
+        action = io.Action(fvel = self.forwardGain * error)
+        return (newState, action)
+
+    def done(self, state):
+        if state == 'start':
+            return False
+        else:
+            (startPos, lastPos) = state
+            return util.within(startPos.distance(lastPos),
+                                self.deltaDesired,
+                                self.distTargetEpsilon)
+
 if __name__ == '__main__':
     # Acumulador
     a = Acumulator()

@@ -98,7 +98,7 @@ init:
     init.board:
         mov rcx, 3 * 3                          ; inicia o contador do loop
         mov rbx, 0x0                            ; move o tabuleiro para rbx     
-        init.board.for: 
+        init.board.for:
             push rcx                            ; 'push' o contador do loop
 
             mov byte [board + rbx], byte ' '    ; move ' ' para a posição atual do tabuleiro
