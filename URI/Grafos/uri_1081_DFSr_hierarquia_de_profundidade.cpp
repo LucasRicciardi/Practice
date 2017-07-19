@@ -7,12 +7,16 @@ int v, e;
 
 bool dfs(int vertex, int depth)
 {
-    // Variável dizer se há algum vértice adjacente não visitado
+    // Variável para dizer se há algum vértice adjacente não visitado
     bool found = false;
     
-    // Marca o vértice como visitado
-    vertex_list[vertex] = 0;
-    
+    // Se o vértice já foi visitado retorna, 
+    // Se não marca ele como visitado e busca os adjacente
+    if (vertex_list[vertex] == 0)
+        return found;
+    else
+        vertex_list[vertex] = 0;
+
     // Busca por vértices adjacentes
     for (int i = 0; i < v; i++)
     {
@@ -61,7 +65,7 @@ int main()
     
     // Lê o número de entradas e inicia o sistema
     scanf("%d", &n);
-    for (int k = 0; k < n; k++)
+    for (k = 0; k < n; k++)
     {   
         // Lê o número de vértices e o número de arestas
         scanf("%d %d", &v, &e);
