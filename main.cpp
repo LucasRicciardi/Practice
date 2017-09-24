@@ -2,10 +2,11 @@
 #include <vector>
 #include <functional>
 #include <algorithm>
+#include <cstdlib>
 #include <time.h>
 
-#define DO_NOTHING 0
 
+#define DO_NOTHING 0
 
 typedef std::vector<int> Vec;
 typedef std::function<bool(int,int)> Fn;
@@ -68,14 +69,15 @@ namespace Algorithms
             int left_child = (root * 2) + 0;
             int right_child = (root * 2) + 1;
 
-            // Verifica se o nó esquerdo é o maior
             #define child_is_greater_than_parent(child) fn(v.at(root+begin-1), v.at(child+begin-1))
+            // Verifica se o nó esquerdo é o maior
             if (left_child <= tree_size and child_is_greater_than_parent(left_child))
                 root = left_child;
 
-            // Verifica se o nó esquerdo é o maior
+            // Verifica se o nó direito é o maior
             if (right_child <= tree_size and child_is_greater_than_parent(right_child))
                 root = right_child;
+            #undef child_is_greater_than_parent
 
             // Verifica se é necessário mudar a estrutura da árvore
             if (root != old_root)
@@ -175,14 +177,16 @@ class SortingAlgorithm
 private:
     std::vector<double> _calls_list;
     double _last_call_time;
+    std::string _name;
 
 protected:
     virtual void _sort(Vec&, int, int, Fn) = 0;
 
 public:
-    SortingAlgorithm():
+    SortingAlgorithm(std::string name):
         _calls_list(),
-        _last_call_time(0)
+        _last_call_time(0),
+        _name(name)
     {}
 
     virtual ~SortingAlgorithm() {}
@@ -196,14 +200,24 @@ public:
         this->_calls_list.push_back(this->last_call_time());
     }
 
+    std::string name() const { return this->_name; }
+
     double last_call_time() const { return this->_last_call_time; }
 
-    int average_time() const
+    double average_time() const
     {
-        int average = 0;
+        double average = 0;
         for (uint32_t i = 0; i < this->_calls_list.size(); i++)
-            average += (this->_calls_list.at(i) - average) / this->_calls_list.size();
+            average += this->_calls_list.at(i) / this->_calls_list.size();
         return average;
+    }
+
+    void log() const
+    {
+        printf("\n");
+        printf("Nome: %s\n", this->name().c_str());
+        printf("Chamda %d chamada: %.4fs\n", (int)this->_calls_list.size(), this->last_call_time());
+        printf("Média atual: %.4fs\n", this->average_time());
     }
 };
 
@@ -220,8 +234,8 @@ private:
     MergeSort::Type _merge_type;
 
 public:
-    MergeSort(MergeSort::Type merge_type = Algorithms::merge):
-        SortingAlgorithm(),
+    MergeSort(MergeSort::Type merge_type = Algorithms::merge, std::string name = "Merge Sort"):
+        SortingAlgorithm(name),
         _merge_type(merge_type)
     {}
 
@@ -235,7 +249,6 @@ protected:
             this->_sort(v, begin, mid, fn);
             this->_sort(v, mid, end, fn);
         }
-
         // Intercala os vetores w = v[begin, mid) e u = v[mid, end)
         this->_merge_type(v, begin, mid, end, fn);
     }
@@ -246,7 +259,7 @@ class MergeSortInLoco:
 {
 public:
     MergeSortInLoco():
-        MergeSort(Algorithms::merge_in_loco)
+        MergeSort(Algorithms::merge_in_loco, "Merge Sort In Loco")
     {}
 };
 
@@ -260,7 +273,7 @@ class QuickSort:
 {
 public:
     QuickSort():
-        SortingAlgorithm()
+        SortingAlgorithm("Quick Sort")
     {}
 
 protected:
@@ -288,7 +301,7 @@ class HeapSort:
 {
 public:
     HeapSort():
-        SortingAlgorithm()
+        SortingAlgorithm("Heap Sort")
     {}
 
 protected:
@@ -319,7 +332,7 @@ class BubbleSort:
 {
 public:
     BubbleSort():
-        SortingAlgorithm()
+        SortingAlgorithm("Bubble Sort")
     {}
 
 protected:
@@ -354,18 +367,16 @@ class InsertionSort:
 {
 public:
     InsertionSort():
-        SortingAlgorithm()
+        SortingAlgorithm("Insertion Sort")
     {}
 
 protected:
     void _sort(Vec& v, int begin, int end, Fn fn)
     {
-        // A cada iteração do loop, o início do vetor está ordenado
+        // A cada iteração do loop, o início do vetor está ordenado,
+        // insere então o novo elemento na posição correta
         for (int i = begin; i < end; i++)
-        {
-            // Insere o maior elemento na posição correta
             Algorithms::insert(v, begin, i, fn);
-        }
     }
 };
 
@@ -377,8 +388,13 @@ protected:
 class UserMenu
 {
 private:
+    Vec v;
 
 public:
+    UserMenu():
+        v()
+    {}
+
     void show_menu()
     {
         std::string author = "Lucas Ricciardi de Salles";
@@ -387,24 +403,126 @@ public:
 
         // Letra a)
         message.at(1) = "1 - 'a-) Fazer programa que grava N números aleatórios um por linha. \
-        O programa deve receber um parâmetro N via linha de comando ou utilizar 10000 como padrão.'";
+        \n             O programa deve receber um parâmetro N via linha de comando ou utilizar 10000 como padrão.'\n";
 
         // Letra b)
         message.at(2) = "2 - 'b-) Fazer programa que lê os números de um arquivo e grava \
-        em um vetor na memória.'";
+        \n             em um vetor na memória.'\n";
 
         // Letra c)
         message.at(3) = "3 - 'c-) Implemente a classificação crescente por seleção \
-        no vetor carregado e salve a saída em um arquivo.'";
+        \n             no vetor carregado e salve a saída em um arquivo.'\n";
 
         // Letra d)
         message.at(4) = "4 - 'd-) Realiza a medida de tempo computacional para sua rotina \
-        de ordenação e imprima na tela o tempo para a ordenação médio.'";
+        \n             de ordenação e imprima na tela o tempo para a ordenação médio.'\n";
 
         // Exibe o menu
-        printf("%s\n", author.c_str());
+        printf("\nNome do autor: %s\n", author.c_str());
         for (uint32_t i = 0; i < message.size(); i++)
             printf("%s\n", message.at(i).c_str());
+    }
+
+    void option_one()
+    {
+        printf("\nCaso queira fazer como no enunciado, feche o programa e passe como argumento, \
+        \ncaso contrário, digite um novo valor que o vetor atual será descartado e um novo será criado !\n\n");
+        int n = get_user_input();
+        this->create_vector(n);
+        printf("\nVetor com %d elementos criados !\n\n", n);
+    }
+
+    void option_two()
+    {
+        printf("\nO vetor atual será descartado e um vetor será lido do arquivo 'file.txt' incluido nesta pasta\n\n");
+        this->v.clear();
+        FILE * file = fopen("file.txt", "a+");
+        int n; char c;
+        while (fscanf(file, "%d%c", &n, &c) == 2)
+            this->v.push_back(n);
+        fflush(file);
+        fclose(file);
+    }
+
+    void option_three()
+    {
+        printf("\nO Vetor atual será ordenado e salvo no arquivo 'file.txt'\n\n");
+        SortingAlgorithm * s = this->get_sorting_algorithm();
+        s->sort(this->v, 0, this->v.size(), [] (int const& a, int const& b)
+        {
+            return a < b;
+        });
+        s->log();
+        FILE * file = fopen("file.txt", "w+");
+        for (uint32_t i = 0; i < this->v.size(); i++)
+            fprintf(file, "%d\n", this->v.at(i));
+        fflush(file);
+        fclose(file);
+        delete s;
+    }
+
+    void option_four()
+    {
+        SortingAlgorithm * s = this->get_sorting_algorithm();
+        printf("\n Quantas chamadas deseja realizar ?\n\n");
+        int n = this->get_user_input();
+        while (n --> 0)
+        {
+            // Ordena
+            s->sort(this->v, 0, this->v.size(), [] (int const& a, int const& b)
+            {
+                return a < b;
+            });
+
+            // Embaralha
+            Algorithms::partition(this->v, 0, this->v.size(), [] (int const&, int const&)
+            {
+                ::srand(::clock());
+                return ::rand() % 2;
+            });
+
+            // Mostra o log
+            s->log();
+        }
+        delete s;
+    }
+
+    SortingAlgorithm * get_sorting_algorithm()
+    {
+        printf("\nEscolha um dos algoritmos de ordenação: \n\
+        ---> 1) Merge Sort \n\
+        ---> 2) Merge Sort In Loco\n\
+        ---> 3) Quick Sort\n\
+        ---> 4) Heap Sort\n\
+        ---> 5) Insertion Sort\n\
+        ---> 6) Bubble Sort\n\n");
+        int n = this->get_user_input();
+        switch (n)
+        {
+            case 1: return new MergeSort;
+            case 2: return new MergeSortInLoco;
+            case 3: return new QuickSort;
+            case 4: return new HeapSort;
+            case 5: return new InsertionSort;
+            case 6: return new BubbleSort;
+            default: return new MergeSort;
+        }
+    }
+
+    int get_user_input()
+    {
+        int n; scanf("%d", &n); getchar();
+        return n;
+    }
+
+    void create_vector(int n)
+    {
+        v.clear();
+        for (int i = 0; i < n; i++)
+        {
+            this->v.push_back(::rand());
+            ::srand(::clock());
+        }
     }
 };
 
@@ -415,18 +533,30 @@ void print_vector(std::vector<int> const& v)
     printf("\n");
 }
 
-int main()
+int main(int argc, char * argv[])
 {
-    SortingAlgorithm * algorithm = new HeapSort;
-
-    std::vector<int> v;
-    for (int i = 9; i > -1; i--)
-        v.push_back(i);
-    print_vector(v);
-    algorithm->sort(v, 0, v.size(), [] (int const& a, int const& b)
+    UserMenu menu;
+    if (argc > 1)
     {
-        return a < b;
-    });
-    print_vector(v);
+        int n = ::atoi(argv[1]);
+        menu.create_vector(n);
+        printf("\nVetor com %d elementos criados !\n\n", n);
+    }
+
+    while (true)
+    {
+        menu.show_menu();
+        int choice = menu.get_user_input();
+        bool done = false;
+        switch (choice)
+        {
+            case 1: menu.option_one(); break;
+            case 2: menu.option_two(); break;
+            case 3: menu.option_three(); break;
+            case 4: menu.option_four(); break;
+            default: done = true;
+        }
+        if (done) break;
+    }
     return 0;
 }
