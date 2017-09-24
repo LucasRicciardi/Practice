@@ -14,7 +14,7 @@ uint64_t mask = 0x1;
 uint64_t shift[2];
 
 // Variáveis auxiliares
-int i, j;
+int i, j, k;
 
 int main()
 {
@@ -25,14 +25,14 @@ int main()
         // Ao invés de um vetor, usarei um inteiro positivo de 64 bits
         // para armazenar os vértices, isso torna o tempo de inicialização constante
         vertex_list |= 0xffffffffffffffff;
-                      
+
         // Lê o nó inicial e o número de vértices e arestas
         scanf("%d", &n);
         scanf("%d %d", &v, &e);
 
         // Se não permitirmos multiplas arestas, o número
         // mínimo de passos é igual ao dobro do número de arestas
-        used_vertices = 0;        
+        used_vertices = 0;
         while (e --> 0)
         {
             // Lê o par de vértices
@@ -43,7 +43,7 @@ int main()
             shift[1] = (mask << j);
 
             // Vê se a posição ainda não foi contada
-            for (int k = 0; k < 2; k++)
+            for (k = 0; k < 2; k++)
                 if (vertex_list & shift[k])
                     (vertex_list ^= shift[k], used_vertices++);
         }
