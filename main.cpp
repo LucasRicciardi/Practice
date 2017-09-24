@@ -5,7 +5,6 @@
 #include <cstdlib>
 #include <time.h>
 
-
 #define DO_NOTHING 0
 
 typedef std::vector<int> Vec;
@@ -466,6 +465,8 @@ public:
         SortingAlgorithm * s = this->get_sorting_algorithm();
         printf("\n Quantas chamadas deseja realizar ?\n\n");
         int n = this->get_user_input();
+        printf("\nA cada chamada o vetor será embaralhado usando o algoritmo de \
+        particionamento e a função ::rand() para que a ordenação tenha efeito\n\n");
         while (n --> 0)
         {
             // Ordena
