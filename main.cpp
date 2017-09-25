@@ -546,11 +546,11 @@ int main(int argc, char * argv[])
         printf("\nVetor com %d elementos criados !\n\n", n);
     }
 
-    while (true)
+    bool done = false;
+    while (not done)
     {
         menu.show_menu();
         int choice = menu.get_user_input();
-        bool done = false;
         switch (choice)
         {
             case 1: menu.option_one(); break;
