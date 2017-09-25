@@ -38,10 +38,8 @@ namespace Algorithms
             else if (greather_than_pivot(j))
                 j--;
             else
-            {
-                std::swap(v.at(i), v.at(j));
-                i++; j--;
-            }
+                std::swap(v.at(i++), v.at(j--));
+            #undef greather_than_pivot
         }
         v.at(begin) = v.at(j);
         v.at(j) = pivot;
