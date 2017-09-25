@@ -27,27 +27,25 @@ namespace Algorithms
     */
     int partition(Vec& v, int begin, int end, Fn fn)
     {
-        int left_pointer = begin;
-        int right_pointer = end-2;
-        int& pivot = v.at(end-1);
-        while (true)
+        int pivot = v.at(begin);
+        int i = begin+1;
+        int j = end-1;
+        while (i <= j)
         {
-            #define value_at_left_is_smaller_than_pivot fn(v.at(left_pointer), pivot)
-            while (value_at_left_is_smaller_than_pivot)
-                left_pointer++;
-            #undef value_at_left_is_smaller_than_pivot
-
-            #define value_at_right_is_greater_than_pivot fn(pivot, v.at(right_pointer))
-            while (value_at_right_is_greater_than_pivot and right_pointer > left_pointer)
-                right_pointer--;
-            #undef value_at_right_is_greater_than_pivot
-
-            if (left_pointer < right_pointer)
-                std::swap(v.at(left_pointer), v.at(right_pointer));
-            else break;
+            #define greather_than_pivot(x) fn(pivot, v.at(x))
+            if (not greather_than_pivot(i))
+                i++;
+            else if (greather_than_pivot(j))
+                j--;
+            else
+            {
+                std::swap(v.at(i), v.at(j));
+                i++; j--;
+            }
         }
-        std::swap(v.at(left_pointer), pivot);
-        return left_pointer;
+        v.at(begin) = v.at(j);
+        v.at(j) = pivot;
+        return j;
     }
 
     /*
@@ -215,7 +213,7 @@ public:
     {
         printf("\n");
         printf("Nome: %s\n", this->name().c_str());
-        printf("Chamda %d chamada: %.4fs\n", (int)this->_calls_list.size(), this->last_call_time());
+        printf("Chamada %d chamada: %.4fs\n", (int)this->_calls_list.size(), this->last_call_time());
         printf("Média atual: %.4fs\n", this->average_time());
     }
 };
@@ -282,11 +280,11 @@ protected:
         if ((end-begin) > 1)
         {
             // Particiona o vetor e descobre o elemento do 'meio' da partição
-            int new_pivot = Algorithms::partition(v, begin, end, fn);
+            int partition_point = Algorithms::partition(v, begin, end, fn);
 
             // Particiona as outras duas metades recursivamente
-            this->_sort(v, begin, new_pivot, fn);
-            this->_sort(v, new_pivot+1, end, fn);
+            this->_sort(v, begin, partition_point, fn);
+            this->_sort(v, partition_point+1, end, fn);
         }
     }
 };
@@ -466,20 +464,26 @@ public:
         printf("\n Quantas chamadas deseja realizar ?\n\n");
         int n = this->get_user_input();
         printf("\nA cada chamada o vetor será embaralhado usando o algoritmo de \
-        particionamento e a função ::rand() para que a ordenação tenha efeito\n\n");
+        \n   forma pseudo aleatória !\n\n");
+        if (this->v.empty())
+        {
+            printf("\n Crie um vetor primeiro !!\n\n");
+            return;
+        }
+
         while (n --> 0)
         {
+            // Embaralha
+            for (uint32_t i = 0; i < v.size(); i++)
+            {
+                std::swap(v.at(i), v.at(::rand() % v.size()));
+            }
+
             // Ordena
             s->sort(this->v, 0, this->v.size(), [] (int const& a, int const& b)
             {
                 return a < b;
-            });
 
-            // Embaralha
-            Algorithms::partition(this->v, 0, this->v.size(), [] (int const&, int const&)
-            {
-                ::srand(::clock());
-                return ::rand() % 2;
             });
 
             // Mostra o log
