@@ -559,7 +559,6 @@ int main(int argc, char * argv[])
             case 4: menu.option_four(); break;
             default: done = true;
         }
-        if (done) break;
     }
     return 0;
 }
