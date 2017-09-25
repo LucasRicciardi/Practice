@@ -47,36 +47,39 @@ namespace Algorithms
     }
 
     /*
-    *   Recebe um vetor de inteiros v, dois inteiros a e b e uma
+    *   Recebe um vetor de inteiros v, , um inteiro r, dois inteiros a e b e uma
     *   função de comparação f. Transforma o vetor v no intervalo
     *   [a, b) em uma heap, ou seja, tal que se n pertence à
-    *   [a+1, b+1), então v[(n/2)-1] > v[n-1]
+    *   [a+1, b+1), então v[(n/2)-1] > v[n-1]. r é a referência do nó inicial
+    *   para que o algoritmo ordene em intervalos onde a != 0
     */
-    void heapify(Vec& v, int begin, int end, Fn fn)
+    void heapify(Vec& v, int ref, int begin, int end, Fn fn)
     {
+
         // Inicia a raíz como sendo o valor em begin
-        int tree_size = (end-begin);
-        int root = 1;
-        while (root < tree_size)
+        while (begin < end)
         {
             // Compara os três nós da sub-árvore atual
-            int old_root = root;
-            int left_child = (root * 2) + 0;
-            int right_child = (root * 2) + 1;
+            int root = begin;
+            int left_child = (root << 1) + 1 - ref;
+            int right_child = (root << 1) + 2 - ref;
 
-            #define child_is_greater_than_parent(child) fn(v.at(root+begin-1), v.at(child+begin-1))
+            #define child_is_greater_than_parent(child) fn(v.at(root), v.at(child))
             // Verifica se o nó esquerdo é o maior
-            if (left_child <= tree_size and child_is_greater_than_parent(left_child))
+            if (left_child < end and child_is_greater_than_parent(left_child))
                 root = left_child;
 
             // Verifica se o nó direito é o maior
-            if (right_child <= tree_size and child_is_greater_than_parent(right_child))
+            if (right_child < end and child_is_greater_than_parent(right_child))
                 root = right_child;
             #undef child_is_greater_than_parent
 
             // Verifica se é necessário mudar a estrutura da árvore
-            if (root != old_root)
-                std::swap(v.at(root+begin-1), v.at(old_root+begin-1));
+            if (root != begin)
+            {
+                std::swap(v.at(root), v.at(begin));
+                begin = root;
+            }
             else break;
         }
     }
@@ -97,9 +100,9 @@ namespace Algorithms
     }
 
     /*
-    *   Algoritmo de intercalação. Recbe um vetor v, dois inteiros a e b e uma
-    *   função de comparação f. Divide v em dois vetores u = v[a, (a+b)/2) e
-    *   w = v[(a+b)/2, b) e assume que u e v estejam ordenados. Intercala os
+    *   Algoritmo de intercalação. Recbe um vetor v, três inteiros a e b e c e uma
+    *   função de comparação f. Divide v em dois vetores u = v[a, b) e
+    *   w = v[b, c) e assume que u e v estejam ordenados. Intercala os
     *   vetores u e w em v de forma que v esteja ordenado
     */
     void merge(Vec& v, int begin, int mid, int end, Fn fn)
@@ -108,8 +111,8 @@ namespace Algorithms
         int i, j, k;
 
         // Copia as duas metades nos vetores auxiliares
-        std::vector<int> left(mid-begin);
-        std::vector<int> right(end-mid);
+        Vec left(mid-begin);
+        Vec right(end-mid);
         for (i = begin, j = mid; i < mid or j < end; i++, j++)
         {
             i < mid ? left.at(i-begin) = v.at(i) : DO_NOTHING;
@@ -159,10 +162,10 @@ namespace Algorithms
 //   Interface de um algoritmo de ordenação, armazena o número de chamadas
 //   e o tempo que cada chamada levou para executar. Cada algoritmo de
 //   ordenação deve receber um vetor de inteiros v, dois inteiros a
-//   e b e uma função p que recebe dois inteiros a e b e retorna bool.
-//   O algoritmo ordena o vetor v de acordo com a ordem imposta por p
+//   e b e uma função f que recebe dois inteiros a e b e retorna bool.
+//   O algoritmo ordena o vetor v de acordo com a ordem imposta por f
 //   no intervao [a, b), ou seja, fechado em a e aberto em b.
-//   Logo, 0 <= a <= b < TAMANHO(v) é a condição para que o algoritmo
+//   Logo, 0 <= a <= b << TAMANHO(v) é a condição para que o algoritmo
 //   funcione corretamente.
 //
 // ########################################################################
@@ -303,16 +306,16 @@ protected:
     void _sort(Vec& v, int begin, int end, Fn fn)
     {
         // Transforma o vetor em uma maxheap
-        for (int i = (end/2); i > 0; i--)
-            Algorithms::heapify(v, i-1, end, fn);
-
+        for (int i = (end/2) + 1; i > begin; i--)
+            Algorithms::heapify(v, begin, i-1, end, fn);
+        
         for (int i = end; i > begin; i--)
         {
             // Troca o valor no topo da heap com o último elemento
             std::swap(v.at(begin), v.at(i-1));
 
             // Insere o valor do topo na posição correta da heap
-            Algorithms::heapify(v, begin, i-2, fn);
+            Algorithms::heapify(v, begin, begin, i-1, fn);
         }
     }
 };
@@ -461,8 +464,7 @@ public:
         SortingAlgorithm * s = this->get_sorting_algorithm();
         printf("\n Quantas chamadas deseja realizar ?\n\n");
         int n = this->get_user_input();
-        printf("\nA cada chamada o vetor será embaralhado usando o algoritmo de \
-        \n   forma pseudo aleatória !\n\n");
+        printf("\nA cada chamada o vetor será embaralhado usando de forma pseudo aleatória !\n\n");
         if (this->v.empty())
         {
             printf("\n Crie um vetor primeiro !!\n\n");
@@ -532,8 +534,11 @@ public:
 void print_vector(std::vector<int> const& v)
 {
     for (uint32_t i = 0; i < v.size(); i++)
-        printf("%d ", v.at(i));
+        printf("%02d ", i);
     printf("\n");
+    for (uint32_t i = 0; i < v.size(); i++)
+        printf("%02d ", v.at(i));
+    printf("\n\n");
 }
 
 int main(int argc, char * argv[])
