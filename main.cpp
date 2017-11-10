@@ -12,7 +12,7 @@ enum Color : unsigned char { Red, Black };
 // # Nó
 // ####################################################
 
-template <class Key, class Value>
+template <typename Key, typename Value>
 struct Node
 {
     // Ligações
@@ -28,10 +28,10 @@ struct Node
     Value value;
 
     // Construtor
-    Node(Key k, Value v, Node * p = nullptr):
-        left(nullptr),
-        right(nullptr),
-        parent(p),
+    Node(Key k, Value v, Node * nil):
+        left(nil),
+        right(nil),
+        parent(nil),
         color(Color::Red),
         key(k),
         value(v)
@@ -80,7 +80,7 @@ enum TraversalOrder : unsigned char
     PostOrder
 };
 
-template <class Key, class Value>
+template <typename Key, typename Value>
 class RedBlackTree
 {
     // ########################################################################
@@ -300,13 +300,17 @@ public: // Interface pública
     {
         // Cria o nó nil
         this->nil = new Leaf(
-            Key(), Value()
+            Key(), Value(), nullptr
         );
         this->nil->color = Color::Black;
 
         // Seta a raíz como nil
         this->root = this->nil;
     }
+
+    // Não pode ser copiada
+    RedBlackTree(RedBlackTree<Key, Value> const&) = delete;
+    RedBlackTree<Key, Value>& operator=(RedBlackTree<Key, Value> const&) = delete;
 
     // #######################################
     // # Destrutor
@@ -336,7 +340,7 @@ public: // Interface pública
     // #######################################
     // # Retorna a folha nil da árvore
     // #######################################
-    Leaf const * const nil_leaf() const { return this->nil; }
+    Leaf * nil_leaf() const { return this->nil; }
 
     // #######################################
     // # Inserção
@@ -368,10 +372,8 @@ public: // Interface pública
 
         // Se chegou até aqui, não será a toa alocar
         // memória para um novo nó
-        Leaf * z = new Leaf(key, value);
+        Leaf * z = new Leaf(key, value, this->nil);
         z->parent = y;
-        z->left = this->nil;
-        z->right = this->nil;
 
         // Se y for null, a árvore está vazia e z
         // é a raíz da árvore
@@ -411,7 +413,7 @@ public: // Interface pública
     // # Travessia em ordem
     // #######################################
     template <typename Fn>
-    void traversal(TraversalOrder traversal_order, Fn fn)
+    void traverse(TraversalOrder traversal_order, Fn fn)
     {
         std::function<void(Leaf*, int)> traversal;
         switch (traversal_order)
@@ -476,42 +478,43 @@ int main()
         std::cout << "Inserindo chaves na árvore ... \n\n";
         for (int i = 0; i < 10; i++)
         {
-            int value = ::rand() % 100;
-            std::cout << "      inserindo " << value << std::endl;
-            tree.insert( value, i );
-            v.push_back(value);
+            int key = ::rand() % 100;
+            std::cout << "      inserindo " << key << " ...";
+            if (tree.insert(key, i))
+            {
+                std::cout << " chave " << key << " inserida com valor " << i << std::endl;
+                v.push_back(key);
+            }
+            else
+            {
+                std::cout << " chave " << key << " já existe na árvore !" << std::endl;
+            }
         }
 
     // ######################################################
     // # Travessia da árvore
     // ######################################################
 
-        // Percorre em ordem
-        std::cout << "\nPercorrendo em ordem ...\n\n";
-        tree.traversal(TraversalOrder::InOrder, [] (Node<int, int> * node, int depth) -> void
+        auto fn = [] (Node<int, int> * node, int depth) -> void
         {
             for (int i = 0; i < depth; i++)
-                std::cout << "     ";
-            std::cout << "Nível " << depth << " = " << node->key << "\n\n";
-        });
+                std::cout << "-----";
+            std::cout << "-> Nível = " << depth;
+            std::cout << ", Chave = " << node->key;
+            std::cout << ", Valor = " << node->value << "\n\n";
+        };
+
+        // Percorre em ordem
+        std::cout << "\nPercorrendo em ordem ...\n\n";
+        tree.traverse(TraversalOrder::InOrder, fn);
 
         // Percorre em pré ordem
         std::cout << "\nPercorrendo em pré-ordem ...\n\n";
-        tree.traversal(TraversalOrder::PreOrder, [] (Node<int, int> * node, int depth) -> void
-        {
-            for (int i = 0; i < depth; i++)
-                std::cout << "     ";
-            std::cout << "Nível " << depth << " = " << node->key << "\n\n";
-        });
+        tree.traverse(TraversalOrder::PreOrder, fn);
 
         // Percorre em pós ordem
         std::cout << "\nPercorrendo em pós-ordem ...\n\n";
-        tree.traversal(TraversalOrder::PostOrder, [] (Node<int, int> * node, int depth) -> void
-        {
-            for (int i = 0; i < depth; i++)
-                std::cout << "     ";
-            std::cout << "Nível " << depth << " = " << node->key << "\n\n";
-        });
+        tree.traverse(TraversalOrder::PostOrder, fn);
 
     // ######################################################
     // # Busca na árvore
@@ -520,12 +523,13 @@ int main()
         // Busca elementos na árvore
         std::cout << "\nBuscando elementos ....\n\n";
         v.push_back(999999);
-        for (int i = 0; i < 11; i++)
+        for (unsigned int i = 0; i < v.size(); i++)
         {
             auto node = tree.find( v.at(i) );
             if ((*node) != tree.nil_leaf())
             {
-                std::cout << "      Encontrada a chave: " << (*node)->key << std::endl;
+                std::cout << "      Encontrada a chave: " << (*node)->key;
+                std::cout << " com o valor " << (*node)->value << std::endl;
             }
             else
             {
