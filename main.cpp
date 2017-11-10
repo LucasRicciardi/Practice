@@ -223,7 +223,10 @@ private: // Métodos privados
                     // Se z for filho à direita gira a árvore
                     if (z == z->parent->right)
                     {
+                        // z sobe um nível na hierarquia
                         z = z->parent;
+
+                        // Gira à esquerda
                         this->left_rotate(z);
                     }
 
@@ -318,6 +321,7 @@ public: // Interface pública
                 kill(leaf->left);
                 kill(leaf->right);
                 delete leaf;
+                leaf = nullptr;
             }
         };
 
@@ -326,12 +330,13 @@ public: // Interface pública
 
         // Deleta a folha nil
         delete this->nil;
+        this->nil = nullptr;
     }
 
     // #######################################
     // # Retorna a folha nil da árvore
     // #######################################
-    Leaf const * const nil_leaf() { return this->nil; }
+    Leaf const * const nil_leaf() const { return this->nil; }
     
     // #######################################
     // # Inserção
@@ -483,7 +488,7 @@ int main()
  
         // Percorre em ordem
         std::cout << "\nPercorrendo em ordem ...\n\n";
-        tree.traversal(TraversalOrder::InOrder, [] (Node<int, int> * node, int depth)
+        tree.traversal(TraversalOrder::InOrder, [] (Node<int, int> * node, int depth) -> void
         {
             for (int i = 0; i < depth; i++)
                 std::cout << "     ";
@@ -492,7 +497,7 @@ int main()
 
         // Percorre em pré ordem
         std::cout << "\nPercorrendo em pré-ordem ...\n\n";
-        tree.traversal(TraversalOrder::PreOrder, [] (Node<int, int> * node, int depth)
+        tree.traversal(TraversalOrder::PreOrder, [] (Node<int, int> * node, int depth) -> void
         {
             for (int i = 0; i < depth; i++)
                 std::cout << "     ";
@@ -501,7 +506,7 @@ int main()
         
         // Percorre em pós ordem
         std::cout << "\nPercorrendo em pós-ordem ...\n\n";
-        tree.traversal(TraversalOrder::PostOrder, [] (Node<int, int> * node, int depth)
+        tree.traversal(TraversalOrder::PostOrder, [] (Node<int, int> * node, int depth) -> void
         {
             for (int i = 0; i < depth; i++)
                 std::cout << "     ";
