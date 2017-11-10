@@ -1,233 +1,223 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
 
-typedef void * Data;
-
-// #######################################################
-// # Estrutura para representar um nó (Node)
-// #######################################################
-
-typedef struct node_struct
+template <typename Key, typename Value>
+struct Node
 {
-    Data data;                      // ponteiro para o valor salvo
-    struct node_struct * right;     // ponteiro para o próximo
-    struct node_struct * left;      // ponteiro para o anterior
+    // Ligações
+    Node * left;
+    Node * right;
+    Node * parent;
 
-} Node;
+    // Cor
+    enum Color { Red, Black } color;
 
-Node * new_node(Data data)
+    // Dados salvos
+    Key key;
+    Value value;
+
+    Node(Key k, Value v, Node * p = nullptr):
+        left(nullptr),
+        right(nullptr),
+        parent(p),
+        color(Node::Color::Red),
+        key(k),
+        value(v)
+    {}
+};
+
+// ########################################################################
+// # RedBlackTree
+// ########################################################################
+
+template <typename Key, typename Value>
+class RedBlackTree
 {
-    // Cria um novo nó
-    Node * node = (Node *) malloc(1 * sizeof(Node));
+    /*
+    *   Propriedades de uma árvore Rubro-Negra (RedBlackTree):
+    *       1. Todo nó é vermelho ou preto
+    *       2. A raíz da árvore é preta
+    *       3. Toda folha (Nil) é preta
+    *       4. Se um nó é vermelho, então seus filhos são todos pretos
+    *       5. Para cada nó, todos os caminhos simples de um nó até suas
+    *           folhas descendentes contém o mesmo número de nós pretos
+    */
 
-    // Inicia o nó
-    node->data = data;
-    node->right = NULL;
-    node->left = NULL;
+    // Facilita a vida
+    using Leaf = Node<Key, Value>;
 
-    // Retorna o nó
-    return node;
-}
+// Atributos
+private:
+    Leaf * root;
 
-Data delete_node(Node * node)
-{
-    // Retira o valor salvo no nó
-    Data data = node->data;
+// Métodos
+private:
+    // ########################################################
+    // # Rotações
+    // ########################################################
 
-    // Libera a memória do nó
-    free(node);
-
-    // Retorna o valor
-    return data;
-}
-
-void node_set_right(Node * A, Node * B)
-{
-    // A aponta para B
-    A->right = B;
-
-    // Se B não for NULL, B volta para A
-    if (B != NULL)
-        B->left = A;
-}
-
-void node_set_left(Node * A, Node * B)
-{
-    // A volta para B
-    A->left = B;
-
-    // Se B não for NULL, B aponta para A
-    if (B != NULL)
-        B->right = A;
-}
-
-// #######################################################
-// # Estrutura lista encadeada para usar de fila e pilha
-// #######################################################
-
-typedef struct list_struct
-{
-    int size;       // tamanho da lista
-    Node * head;    // começo da lista
-    Node * tail;    // final da lista
-
-} LinkedList;
-
-LinkedList * new_list()
-{
-    // Cria uma nova lista
-    LinkedList * list = (LinkedList *) malloc(1 * sizeof(LinkedList));
-
-    // Inicia a lista
-    list->size = 0;
-    list->head = NULL;
-    list->tail = NULL;
-
-    // Retorna a lista
-    return list;
-}
-
-void list_push(LinkedList * list, Data data)
-{
-    // Cria um novo nó
-    Node * node = new_node(data);
-
-    // Se a lista estiver sem 'head'
-    if (list->head == NULL)
+    void left_rotate(Leaf * x)
     {
-        list->head = node;
+        // y é o filho à direita de x
+        Leaf * y = x->right;
+
+        // Novas configurações de y:
+        //  -- Pai de y será o pai de x
+        //  -- Filho à esquerda de y será x
+        //  -- Filho à direita de y não muda
+
+        // Novas configurações de x:
+        //  -- Pai de x será y
+        //  -- Filho à esquerda de x não muda
+        //  -- Filho à direita de x será o filho à esquerda de y
+
+        // Reposicionamento externo
+        y->parent = x->parent;
+        x->right = y->left;
+
+        // Reposicionamento interno
+        y->left = x;
+        x->parent = y;
+
+        // Valores que não mudam
+        y->right = y->right;
+        x->left = x->left;
     }
 
-    // Se a lista estiver sem 'tail'
-    else if (list->tail == NULL)
+    void right_rotate(Leaf * x)
     {
-        list->tail = node;
-        node_set_right(list->head, list->tail);
-        node_set_left(list->tail, list->head);
+        // y é o filho á esquerda de x
+        Leaf * y = x->left;
+
+        // Novas configurações de y:
+        //  -- Pai de y será o pai de x
+        //  -- Filho à esquerda de y não muda
+        //  -- FIlho a direita de y será x
+
+        // Novas configurações de x:
+        //  -- Pai de x será y
+        //  -- Filho à esquerda de x será o filho a direita de y
+        //  -- Filho à direita de x será o mesmo
+
+        // Reposicionamento externo
+        y->parent = x->parent;
+        x->left = y->right;
+
+        // Reposicionamento interno
+        y->right = x;
+        x->parent = y;
+
+        // Valores que não mudam
+        y->left = y->left;
+        x->right = x->right;
     }
 
-    // Se a lista estiver 'completa'
-    else
+    // ########################################################
+    // # Fix Up
+    // ########################################################
+    void fix_up(Leaf * z)
     {
-        node_set_right(list->tail, node);
-        node_set_left(node, list->tail);
-        list->tail = node;
+        // Primeira condição violada:
+        //  -- Se z é vermelho e o pai de z também,
+        //  então a propriedade 4 da árvore foi violada
+        while (z->parent->color == Leaf::Color::Red)
+        {
+            // Se o pai de z for filho à esquerda do avô de z
+            if (z->parent == z->parent->parent->left)
+            {
+                // y é o filho a direita do avô de z
+                Leaf * y = z->parent->parent->right;
+
+                if (y->color == Leaf::Color::Red)
+                {
+                    z->parent->color = Leaf::Color::Black;
+                    y->color = Leaf::Color::Black;
+                    z->parent->parent->color = Leaf::Color::Red;
+                    z = z->parent->parent;
+                }
+
+                // Se z for filho a direita
+                else if (z == z->parent->right)
+                {
+                    z = z->parent;
+                    this->left_rotate(z);
+                }
+            }
+
+            // Se o pai de z for filho à direita do avô de z
+            else
+            {
+
+            }
+        }
+
+        // Aplica preto à cor da raíz
+        this->root->color = Leaf::Color::Black;
     }
 
-    // Incrementa o tamanho da lista
-    list->size++;
-}
+public:
+    RedBlackTree():
+        root(nullptr)
+    {}
 
-Data pop_front(LinkedList * list)
-{
-    // Salva uma referência ao nó posterior ao 'head'
-    Node * new_head = list->head->right;
-
-    // Retira o dado do nó deletado
-    Data data = delete_node(list->head);
-
-    // Aponta a nova 'head' e decrementa o tamanho da lista
-    list->head = new_head;
-    list->size--;
-
-    // Retorna o dado
-    return data;
-}
-
-Data pop_back(LinkedList * list)
-{
-    // Salva uma referência ao nó anterior ao 'tail'
-    Node * new_tail = list->tail->left;
-
-    // Retira o dado do nó deletado
-    Data data = delete_node(list->tail);
-
-    // Aponta a nova 'tail' e decrementa o tamanho da lista
-    list->tail = new_tail;
-    list->size--;
-
-    // Retorna o dado
-    return data;
-}
-
-typedef void (*CleanOperation) (void*);
-void delete_list(LinkedList * list, CleanOperation clean_operation)
-{
-    // Enquando tiver elementos na list
-    while (list->size > 0)
+    // ########################################################
+    // # Inserção
+    // ########################################################
+    bool insert(Key key, Value value)
     {
-        // Retira o dado do nó deletado
-        Data data = pop_back(list);
+        // Busca pelo elemento que será pai do novo elemento
+        Leaf * y = nullptr;
+        for (Leaf * x = this->root; x != nullptr; )
+        {
+            // Salva em y o último nó visitado
+            y = x;
 
-        // Se o usuário quiser uma última chance de 'limpar a casa'
-        if (clean_operation != NULL)
-            clean_operation(data);
+            // Vai para a esquerda
+            if (x->key < key)
+            {
+                x = x->left;
+            }
+
+            // Vai para a direita
+            else if (x->key > key)
+            {
+                x = x->right;
+            }
+
+            // Achou um elemento, retorna false
+            else return false;
+        }
+
+        // Não existe um elemento de chave 'key', então cria um novo nó
+        Leaf * z = new Leaf(key, value, y);
+
+        // Se o y for null, então z é a raíz da árvore
+        if (y == nullptr)
+        {
+            this->root = z;
+        }
+
+        // Se a chave de z for menor do que a chave de y, então z é fiho a esquerda
+        else if (y->key < z->key)
+        {
+            y->left = z;
+        }
+
+        // Se a chave de z for maior do que a chave de y, então z é filho a direita
+        else if (y->key > z->key)
+        {
+            y->right = z;
+        }
+
+        // Conserta a árvore para manter as propriedades
+        this->fix_up(z);
+
+        // Retorna true
+        return true;
     }
-
-    // Libera a lista
-    free(list);
-}
-
-// #######################################################
-// # Estrutura árvore
-// #######################################################
-
-typedef int (*FormationRule) (Data, Data);
-typedef struct tree_struct
-{
-    Node * root;                        // raíz da árvore
-    FormationRule formation_rule;       // lei de formação da árvore
-
-} Tree;
-
-Tree * new_tree(FormationRule formation_rule)
-{
-    // Cria uma nova árvore
-    Tree * tree = (Tree *) malloc(1 * sizeof(Tree));
-
-    // Inicia a árvore
-    tree->root = NULL;
-    tree->formation_rule = formation_rule;
-
-    // Retorna a árvore
-    return tree;
-}
-
-void tree_add_leaf(Tree * tree, Data data)
-{
-    // Recebe o endereço da raíz
-    Node ** root = &(tree->root);
-
-    // Busca a posição correta na árvore
-    while ((*root) != NULL)
-    {
-        if (tree->formation_rule((*root)->data, data))
-            root = &((*root)->left);
-        else
-            root = &((*root)->right);
-    }
-
-    // Insere o valor na árvore
-    (*root) = new_node(data);
-}
-
-int binary_tree_formation_rule(void * root, void * leaf)
-{
-    int * _root = (int *) root;
-    int * _leaf = (int *) leaf;
-    return (*_root) > (*_leaf);
-}
+};
 
 int main()
 {
-    Tree * binary_tree = new_tree(binary_tree_formation_rule);
-    for (int i = 0; i < 100; i++)
-    {
-        int * data = (int *) malloc(1 * sizeof(int));
-        *data = rand() % 100;
-        tree_add_leaf(binary_tree, data);
-    }
-    foo(binary_tree);
-    printf("\n");
+    RedBlackTree<int, int> rb;
     return 0;
 }

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Controlador de Ar Condicionado</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular.min.js"></script>
+
+</head>
+
+<!-- Estilo -->
+<style>
+
+    /* Estilo do Jumbotron */
+    .jumbotron {
+
+        /* Sem margem entre o Jumbotron e o navbar */
+        margin-bottom: 0;
+    }
+
+    /* Estilo da Table */
+    .table {
+        padding-top: 100%;
+    }
+
+
+    /* Estilo do Rodapé */
+    footer {
+       background-color: #555;
+       color: white;
+       padding: 1%;
+       bottom: 0;
+     }
+
+</style>
+
+<body ng-app="App" ng-controller="Controller">
+
+    <!-- Cabeçalho da página -->
+        <div class="jumbotron container-fluid">
+            <h1> Controlador de Ar-Condicionado </h1>
+        </div>
+
+    <!-- Navbar para depois -->
+    <nav class="navbar navbar-default">
+        <div class="container-fluid">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="#home"> Controlador de Ar Condicionado </a>
+            </div>
+            <ul class="nav navbar-nav">
+                <li role="presentation" class="active">
+                    <a href="#home" aria-controls="home" role="tab" data-toggle="tab"> Home </a>
+                </li>
+                <li role="presentation">
+                    <a href="#sobre" aria-controls="sobre" role="tab" data-toggle="tab"> Sobre </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Páginas do Navbar -->
+    <div class="tab-content">
+
+        <!-- Home page -->
+        <div role="tabpanel" class="tab-pane fade in active" id="home">
+                <div class="row container-fluid"></div>
+                <div class="row container-fluid">
+
+                    <!-- O gráfico ocupará a maior parte da tela -->
+                    <div class="col-lg-8 container-fluid">
+                        <canvas id="chart"></canvas>
+                    </div>
+
+                    <!-- O resto será para um menu de controlador e chat-->
+                    <div class="col-lg-4" style="padding-top: 2%;">
+                        <div class="panel panel-default container-fluid">
+                            <div class="panel panel-header">
+                                <table class="table table-responsive container-fluid">
+                                    <thead>
+                                        <h4 align="center"> Valores Médios </h4>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td> Temperatura: </td>
+                                            <td> {{ data.temperature }}</td>
+                                            <td> °C </td>
+                                        </tr>
+                                        <tr>
+                                            <td> Som Ambiente: </td>
+                                            <td> {{ data.sound }}</td>
+                                            <td> °C </td>
+                                        </tr>
+                                        <tr>
+                                            <td> Luminosidade: </td>
+                                            <td> {{ data.light }}</td>
+                                            <td> °C </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                            <!-- Linha em branco -->
+                            <div class="row">
+                            </div>
+
+                        <div class="panel panel-default container-fluid">
+
+                            <!-- Controladores -->
+                            <table class="table table-responsive container-fluid">
+                                <thead>
+                                    <h4 align="center">  Controladores </h4>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td> Temperatura: </td>
+                                        <td>
+                                            <input type="number" min="0" max="40" step="1" value="36"
+                                            ng-model="temperature" ng-change="change()"/>
+                                        </td>
+                                        <td> °C </td>
+                                    </tr>
+                                    <tr>
+                                        <td> Dimmer: </td>
+                                        <td>
+                                            <input type="number" min="0" max="99" step="1" value="50"
+                                            ng-model="dimmer" ng-change="change()"/>
+                                        </td>
+                                        <td> °C </td>
+                                    </tr>
+                                    <tr>
+                                        <td> Luz: </td>
+                                        <td>
+                                            <label><input type="checkbox" On/Off value="off"
+                                            ng-model="light" ng-change="change()"/></label>
+                                        </td>
+                                        <td>
+                                            <!-- NADA AQUI !! -->
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                        </div>
+                    </div>
+                </div>
+        </div>
+
+        <!-- Sobre o projeto -->
+        <div role="tabpanel" class="tab-pane fade" id="sobre" class="hidden">
+
+            <div class="row">
+                <div class="col-lg-2">
+                    <!-- NADA -->
+                </div>
+                <!-- Descrição -->
+                <div class="col-lg-8">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">
+                            <h2 align="center"> Sobre o Projeto </h2>
+                        </div>
+                        <div class="panel-body">
+                            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla congue vitae mauris ut pharetra. Donec vitae vehicula neque. Nunc consectetur massa eget mauris dignissim, in interdum diam tristique. Nam dapibus scelerisque euismod. Praesent laoreet aliquam ipsum sit amet maximus. Maecenas et placerat augue. Integer eu arcu at tortor dapibus porta non sed nisi. Morbi sit amet sagittis est. Sed varius elementum tincidunt. Integer id urna at odio dapibus venenatis ac quis mauris. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Nulla malesuada a orci sit amet consectetur.
+
+Mauris vel nisl magna. Integer luctus nisl eu lacus condimentum tempor. Morbi tellus nisl, tincidunt at ex eget, suscipit malesuada ante. Fusce varius lacus et mi ornare, eget ornare purus ornare. Vivamus sed urna iaculis, lacinia dui id, pretium urna. Integer diam nunc, suscipit ac consequat vitae, vestibulum eu erat. In hendrerit nunc eros, tempor posuere dui suscipit quis.
+
+Vivamus blandit tincidunt vestibulum. Duis tincidunt vehicula velit ac tristique. Integer eu tempor tellus. Suspendisse porta, nibh a suscipit imperdiet, sem tortor pulvinar tortor, id eleifend odio massa ut sapien. Sed lobortis, massa eget accumsan luctus, dui arcu fringilla nulla, id lacinia nunc leo eget nibh. Praesent vehicula auctor leo at rhoncus. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Ut feugiat felis sit amet luctus malesuada. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque molestie mauris metus, at pretium lectus euismod quis.
+
+Morbi ut dui et dui viverra vulputate vel vitae libero. Vivamus tellus diam, vestibulum in nunc et, facilisis pharetra metus. Vestibulum sed sem nec ipsum tempus ullamcorper. Cras quam leo, pretium sed vehicula nec, bibendum vel felis. Aliquam suscipit varius risus, eu gravida odio fringilla viverra. Quisque posuere dui varius, posuere purus nec, sagittis eros. Nulla sem massa, dictum id lorem ac, ultrices molestie tortor. Mauris ultrices vel quam id congue. Aenean quis dolor velit. Fusce et varius nisl, et semper augue.
+
+Nullam ultrices elit elementum pharetra tempor. Aenean aliquet rutrum tellus, in pharetra lacus condimentum convallis. Cras porta, lorem id semper tempor, arcu purus scelerisque nisl, vel auctor urna arcu ut mi. Mauris pulvinar neque dui, nec consequat lorem efficitur vitae. Pellentesque vitae lorem auctor, tempor dolor sed, convallis ligula. Nunc fringilla lorem nec bibendum consequat. Donec quis dui vitae ligula vehicula fermentum et vitae lacus. Fusce in maximus sapien, non placerat felis.
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-2">
+                    <!-- NADA -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rodapé da página -->
+    <footer class="container-fluid">
+        <p align="right">Autor: Lucas Ricciardi de Salles </p>
+    </footer>
+
+</body>
+
+    <!-- Scripts -->
+    <script>
+
+        var telemetry = {
+
+            // Temperatura
+            temperature: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
+
+            // Som
+            sound: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
+
+            // Luz
+            light: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ]
+        };
+
+        // Cria o gráfico
+        var ctx = $("#chart").get(0).getContext("2d");
+        var chart = new Chart(ctx, {
+
+            // Tipo do gráfico
+            type: 'line',
+
+            // Dados do gráfico
+            data: {
+
+                labels: [ '', '', '', '' , '', '', '', '', '', '' ],
+
+                // Conjuntos de dados para amostragem
+                datasets: [{
+
+                    // Dados da temperatura
+                    label: 'Temperatura',
+                    fillColor: "rgba(151, 187, 205, 0.2)",
+                    strokeColor: "rgba(151,187,205,1)",
+                    pointColor: "rgba(220,220,220,1)",
+                    pointStrokeColor: "#fff",
+                    pointHighlightFill: "#fff",
+                    pointHighlightStroke: "rgba(220,220,220,1)",
+                    data: telemetry.temperature
+                },
+                {
+                    // Dados do som
+                    label: "Som Ambiente",
+                    fillColor: "rgba(246,150,121,0.2)",
+                    strokeColor: "rgba(242,108,079,1)",
+                    pointColor: "rgba(151,187,205,1)",
+                    pointStrokeColor: "#fff",
+                    pointHighlightFill: "#fff",
+                    pointHighlightStroke: "rgba(151,187,205,1)",
+                    data: telemetry.sound
+                },
+                {
+                    // Dados da luminosidade
+                    label: "Luminosidade",
+                    fillColor: "rgba(246,150,121,0.2)",
+                    strokeColor: "rgba(242,108,079,1)",
+                    pointColor: "rgba(151,187,205,1)",
+                    pointStrokeColor: "#fff",
+                    pointHighlightFill: "#fff",
+                    pointHighlightStroke: "rgba(151,187,205,1)",
+                    data: telemetry.light
+                }]
+            }
+        });
+
+
+        // Angular
+        var app = angular.module('App', []);
+        app.controller('Controller', function($scope, $http, $interval)
+        {
+            // Inicia os valores para amostragem
+            $scope.data = {
+                temperature: 20,
+                sound: 50,
+                light: 100
+            };
+
+            // Valores iniciais
+            $scope.temperature = $scope.data.temperature;
+            $scope.dimmer = $scope.data.sound;
+            $scope.light = $scope.data.light;
+
+            // Funções que enviam comandos
+            $scope.change = function() {
+                var data = {
+                    temperature: $scope.temperature,
+                    dimmer: $scope.dimmer,
+                    light: $scope.light
+                };
+                $http.post('/send', data).then( function(response) {
+                    console.log(response);
+                });
+            };
+
+            // Função que solicita solicita dados do sistema
+            // e atualiza a página com os novos dados
+            var request_data = function() {
+                $http.get('request')
+                    .then( function(response) {
+                        for (var i = telemetry.temperature.length; i > 0 ; i--) {
+                            telemetry.temperature[i-1] = telemetry.temperature[i-2];
+                            telemetry.sound[i-1] = telemetry.sound[i-2];
+                            telemetry.light[i-1] = telemetry.light[i-2];
+                        }
+                        console.log(response.data);
+                        telemetry.temperature[0] = response.data.temperature % 50;
+                        telemetry.sound[0] = response.data.sound % 50;
+                        telemetry.light[0] = response.data.light % 50;
+                        chart.update();
+                    });
+            };
+            $interval( function() { request_data(); }, 800);
+        });
+
+    </script>
+</html>
