@@ -1,5 +1,6 @@
 #include <iostream>
 #include <functional>
+#include <vector>
 
 // ####################################################
 // # Cor
@@ -35,26 +36,67 @@ struct Node
         key(k),
         value(v)
     {}
+
+    static Node ** find(Node ** root, Node ** nil, Key const& key)
+    {
+        Node ** x = root;
+        while ((*x) != (*nil))
+        {
+            // Referência para facilitar a sintaxe
+            auto const& x_key = (*x)->key;
+                
+            // Se for igual sai do loop
+            if (key == x_key)
+            {
+                break;
+            }
+
+            // Se for menor vai pra esquerda
+            else if (key < x_key)
+            {
+                x = &((*x)->left);
+            }
+
+            // Se for maior vai para direita
+            else if (key > x_key)
+            {
+                x = &((*x)->right);
+            }
+        }
+
+        // Retorna o nó
+        return x;
+    }
 };
 
 // ####################################################
 // # Árvore Vermelho-Preta
 // ####################################################
 
+enum TraversalOrder : unsigned char
+{
+    InOrder,
+    PreOrder,
+    PostOrder
+};
+
 template <class Key, class Value>
 class RedBlackTree
 {
-    /*
-    *   Propriedades da Arvore Vermelho e Preta:
-    *       1 - Cada nó é vermelho OU preto
-    *       2 - A raiz é preta
-    *       3 - Todas as folhas ("NULL" ou NIL) são pretas
-    *       4 - Se um nó for vermelho, então ambos os seus
-    *           filho são pretos
-    *       5 - Para cada nó, todos os caminhos do nó para
-    *           as folhas descendentes contém o mesmo número
-    *           de nós pretos
-    */
+    // ########################################################################
+    // # Propriedades da Arvore Vermelho e Preta:
+    // ########################################################################
+    // #    
+    // #    1 - Cada nó é vermelho OU preto
+    // #    2 - A raiz é preta
+    // #    3 - Todas as folhas ("NULL" ou NIL) são pretas
+    // #    4 - Se um nó for vermelho, então ambos os seus
+    // #        filho são pretos
+    // #    5 - Para cada nó, todos os caminhos do nó para
+    // #        as folhas descendentes contém o mesmo número
+    // #        de nós pretos
+    // #
+    // ########################################################################
 
 private: // Atributos privados
     
@@ -69,21 +111,9 @@ private: // Atributos privados
 
 private: // Métodos privados
 
-    // #######################################
-    // # Rotações
-    // #######################################
-    // #
-    // #    Propriedades de x:
-    // #        - Pai de x será y
-    // #        - Filho à esquerda de x será o fihlo à direta de y
-    // #        - Filho à direita de x continuará o mesmo
-    // #
-    // #    Propriedades de y:
-    // #        - Pai de y será o pai de x
-    // #        - Filho à esquerda de y continuará o mesmo
-    // #        - Filho à direita de y será x
-    // #
-    // #######################################
+    // ########################################################################
+    // # Rotações                                                             
+    // ########################################################################
     
     void left_rotate(Leaf * x)
     {
@@ -257,6 +287,10 @@ private: // Métodos privados
     }
 
 public: // Interface pública
+
+    // #######################################
+    // # Construtor
+    // #######################################
     RedBlackTree():
         root(nullptr),
         nil(nullptr)
@@ -271,6 +305,34 @@ public: // Interface pública
         this->root = this->nil;
     }
 
+    // #######################################
+    // # Destrutor
+    // #######################################
+    ~RedBlackTree()
+    {
+        // Função para deletar recursivamente as folhas da árvore
+        std::function<void(Leaf*)> kill = [&] (Leaf * leaf) -> void
+        {
+            if (leaf != this->nil)
+            {
+                kill(leaf->left);
+                kill(leaf->right);
+                delete leaf;
+            }
+        };
+
+        // Delete recursivamente a árvore
+        kill(this->root);        
+
+        // Deleta a folha nil
+        delete this->nil;
+    }
+
+    // #######################################
+    // # Retorna a folha nil da árvore
+    // #######################################
+    Leaf const * const nil_leaf() { return this->nil; }
+    
     // #######################################
     // # Inserção
     // #######################################
@@ -330,42 +392,141 @@ public: // Interface pública
     }
 
     // #######################################
+    // # Busca na árvore
+    // #######################################
+    Leaf ** find(Key const& key)
+    {
+        // Começa a busca pela raíz
+        return Leaf::find(
+            &(this->root), &(this->nil), key
+        );
+    }
+
+    // #######################################
     // # Travessia em ordem
     // #######################################
     template <typename Fn>
-    void pre_order_traversal(Fn fn)
+    void traversal(TraversalOrder traversal_order, Fn fn)
     {
-        std::function<void(Leaf*, int)> traversal = [&] (Leaf * leaf, int depth)
+        std::function<void(Leaf*, int)> traversal;
+        switch (traversal_order)
         {
-            if (leaf != this->nil)
+            case TraversalOrder::InOrder :
             {
-                fn(leaf, depth);
-                traversal(leaf->left, depth+1);
-                traversal(leaf->right, depth+1);
-            }
-        };
+                traversal = [&] (Leaf * leaf, int depth) -> void
+                {
+                    if (leaf != this->nil)
+                    {
+                        traversal(leaf->left, depth+1);
+                        fn(leaf, depth);
+                        traversal(leaf->right, depth+1);
+                    }
+                };
+
+            } break;
+
+            case TraversalOrder::PreOrder :
+            {
+                traversal = [&] (Leaf * leaf, int depth) -> void
+                {
+                    if (leaf != this->nil)
+                    {
+                        fn(leaf, depth);
+                        traversal(leaf->left, depth+1);
+                        traversal(leaf->right, depth+1);
+                    }
+                };
+
+            } break;
+
+            case TraversalOrder::PostOrder :
+            {
+                traversal = [&] (Leaf * leaf, int depth) -> void
+                {
+                    if (leaf != this->nil)
+                    {
+                        traversal(leaf->left, depth+1);
+                        traversal(leaf->right, depth+1);
+                        fn(leaf, depth);
+                    }
+                };
+
+            } break;
+        }
         traversal(this->root, 0);
     }
 };
 
 int main()
 {
-    RedBlackTree<int, int> tree;
-    std::cout << "Inserindo chaves na árvore ... " << std::endl;
-    for (int i = 0; i < 10; i++)
-    {
-        int value = ::rand() % 100;
-        std::cout << "      inserindo " << value << std::endl;
-        tree.insert( value, i );
-    }
+    // Salva os valores inseridos
+    std::vector<int> v;
 
-    std::cout << "\n\n";
-    tree.pre_order_traversal([] (Node<int, int> * node, int depth)
-    {
-        for (int i = 0; i < depth; i++)
-            std::cout << "     ";
-        std::cout << "Nível " << depth << " = " << node->key << "\n\n";
-    });
-    
+    // ######################################################
+    // # Inserção da árvore
+    // ######################################################
+ 
+        // Cria a árvore vermelho e preta e insere elementos
+        RedBlackTree<int, int> tree;
+        std::cout << "Inserindo chaves na árvore ... \n\n";
+        for (int i = 0; i < 10; i++)
+        {
+            int value = ::rand() % 100;
+            std::cout << "      inserindo " << value << std::endl;
+            tree.insert( value, i );
+            v.push_back(value);
+        }
+
+    // ######################################################
+    // # Travessia da árvore
+    // ######################################################
+ 
+        // Percorre em ordem
+        std::cout << "\nPercorrendo em ordem ...\n\n";
+        tree.traversal(TraversalOrder::InOrder, [] (Node<int, int> * node, int depth)
+        {
+            for (int i = 0; i < depth; i++)
+                std::cout << "     ";
+            std::cout << "Nível " << depth << " = " << node->key << "\n\n";
+        });
+
+        // Percorre em pré ordem
+        std::cout << "\nPercorrendo em pré-ordem ...\n\n";
+        tree.traversal(TraversalOrder::PreOrder, [] (Node<int, int> * node, int depth)
+        {
+            for (int i = 0; i < depth; i++)
+                std::cout << "     ";
+            std::cout << "Nível " << depth << " = " << node->key << "\n\n";
+        });
+        
+        // Percorre em pós ordem
+        std::cout << "\nPercorrendo em pós-ordem ...\n\n";
+        tree.traversal(TraversalOrder::PostOrder, [] (Node<int, int> * node, int depth)
+        {
+            for (int i = 0; i < depth; i++)
+                std::cout << "     ";
+            std::cout << "Nível " << depth << " = " << node->key << "\n\n";
+        });
+
+    // ######################################################
+    // # Busca na árvore
+    // ######################################################
+ 
+        // Busca elementos na árvore
+        std::cout << "\nBuscando elementos ....\n\n";
+        v.push_back(999999);
+        for (int i = 0; i < 11; i++)
+        {
+            auto node = tree.find( v.at(i) );
+            if ((*node) != tree.nil_leaf())
+            {
+                std::cout << "      Encontrada a chave: " << (*node)->key << std::endl;
+            }
+            else
+            {
+                std::cout << "      Não encontrada a chave: " << v.at(i) << std::endl;
+            }
+        }
+
     return 0;
 }
