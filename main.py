@@ -9,7 +9,7 @@ import math
 def show_results(G, u):
     print('\nResultados da busca pelos caminhos mais curtos ...')
     print('Source (raíz) = {}'.format(u.value))
-    for v in sorted(G.V, key=lambda v: v.value):
+    for v in sorted(G.vertices, key=lambda v: v.value):
         print('Nó: {}, Distância mínima: {}, Caminho: '.format(v.value, v.distance), end='')
         p = v
         if p.parent == None:
@@ -45,7 +45,7 @@ class Graph():
     def __init__(self, representation, weigthed):
         self.representation = representation()
         self.weigthed = weigthed
-        self.V = []
+        self.vertices = []
 
     @property
     def E(self):
@@ -53,14 +53,14 @@ class Graph():
 
     def debug(self):
         print('Nós: ', end='')
-        for u in self.V:
+        for u in self.vertices:
             print('{} '.format(u.value), end='')
         print('\n')
         self.representation.debug()
 
     def add_nodes(self, node_list):
         for node in node_list:
-            self.V.append(
+            self.vertices.append(
                 Graph.Node(node)
             )
 
@@ -82,12 +82,12 @@ class Graph():
     #############################################################################
 
     def dijkstra(self, s):
-        for u in self.V:
+        for u in self.vertices:
             u.distance = math.inf
             u.parent =  None
         s.distance = 0
         S = []
-        Q = [ u for u in self.V ]
+        Q = [ u for u in self.vertices ]
         while len(Q) > 0:
             u = min(Q, key=lambda v: v.distance)
             S.append(u)
@@ -98,11 +98,11 @@ class Graph():
             Q.remove(u)
 
     def bellman_ford(self, s):
-        for u in self.V:
+        for u in self.vertices:
             u.distance = math.inf
             u.parent = None
         s.distance = 0
-        for i in range(0, len(self.V)):
+        for i in range(0, len(self.vertices)):
             for (u, v) in self.edges():
                 if v.distance > u.distance + self.weight(u, v):
                     v.distance = u.distance + self.weight(u, v)
@@ -113,15 +113,18 @@ class Graph():
         return True
 
     def floyd_warshall(self):
-        dist = [ [ math.inf for _ in range(0, len(self.V)) ] for _ in range(0, len(self.V)) ]
+        dist = [
+            [ math.inf for _ in range(0, len(self.vertices)) ]
+                for _ in range(0, len(self.vertices))
+        ]
         for (u, v) in self.edges():
             dist[u.value][v.value] = self.weight(u, v)
-        for k in range(0, len(self.V)):
-            for i in range(0, len(self.V)):
-                for j in range(0, len(self.V)):
+        for k in range(0, len(self.vertices)):
+            for i in range(0, len(self.vertices)):
+                for j in range(0, len(self.vertices)):
                     if dist[i][j] > dist[i][k] + dist[k][j]:
                         dist[i][j] = dist[i][k] + dist[k][j]
-        for i in range(0, len(self.V)):
+        for i in range(0, len(self.vertices)):
             dist[i][i] = math.inf
         return dist
 
@@ -137,9 +140,9 @@ class AdjacencyMatrix():
 
     def add_edges(self, G, edge_list):
         self.edges = []
-        for i in range(0, len(G.V)):
+        for i in range(0, len(G.vertices)):
             self.edges.append([])
-            for j in range(0, len(G.V)):
+            for j in range(0, len(G.vertices)):
                 self.edges[i].append(0)
         for (i, j), w in edge_list:
             self.edges[i][j] = w if G.weigthed else 1
@@ -149,17 +152,19 @@ class AdjacencyMatrix():
         for i in range(0, len(self.edges)):
             for j in range(0, len(self.edges)):
                 if self.edges[i][j] > 0:
-                    r.append([ G.V[i],G.V[j] ])
+                    r.append(
+                        [ G.vertices[i], G.vertices[j] ]
+                    )
         return r
 
     def neighbours(self, G, u):
         r = []
         for n, w in enumerate(self.edges[u.value]):
-            if n == u:
+            if n == u.value:
                 pass
             else:
                 if w > 0:
-                    r.append(G.V[n])
+                    r.append(G.vertices[n])
         return r
 
     def weight(self, u, v):
@@ -198,10 +203,12 @@ class AdjacencyList():
                 node = self.edges[i]
                 while node.next != None:
                     node = node.next
-                node.next = AdjacencyList.Node(G.V[j], w)
+                node.next = AdjacencyList.Node(
+                    G.vertices[j], w
+                )
             except IndexError:
                 self.edges.append(
-                    AdjacencyList.Node(G.V[j], w)
+                    AdjacencyList.Node(G.vertices[j], w)
                 )
 
     def edges_set(self, G):
@@ -209,7 +216,7 @@ class AdjacencyList():
         for n, edge in enumerate(self.edges):
             node = edge
             while node != None:
-                r.append( [ G.V[n], node.node ])
+                r.append( [ G.vertices[n], node.node ])
                 node = node.next
         return r
 
@@ -315,7 +322,7 @@ def main():
         print('###############################################################')
         print('# Rodando o Algoritmo de Dijkstra em todos os vértices ...')
         print('###############################################################\n')
-        for u in G.V:
+        for u in G.vertices:
             G.dijkstra(u)
             show_results(G, u)
 
@@ -323,7 +330,7 @@ def main():
         print('###############################################################')
         print('# Rodando o Algoritmo de Bellman-Ford em todos os vértices ...')
         print('###############################################################\n')
-        for u in G.V:
+        for u in G.vertices:
             if G.bellman_ford(u) == True:
                 print('G não contém ciclos negativos')
             else:
@@ -337,7 +344,7 @@ def main():
         distance_matrix = G.floyd_warshall()
 
         print('  ', end='')
-        for i in range(0, len(G.V)):
+        for i in range(0, len(G.vertices)):
             print("  {}  ".format(i), end='')
         print('')
         for n, row in enumerate(distance_matrix):
@@ -349,6 +356,7 @@ def main():
                     msg = '[{0:3d}]'
                 print(msg.format(line), end='')
             print('')
+        print('')
 
 if __name__ == '__main__':
     main()
