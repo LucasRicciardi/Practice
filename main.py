@@ -42,9 +42,9 @@ class Graph():
             self.distance = 0
             self.parent = None
 
-    def __init__(self, representation, weigthed):
+    def __init__(self, representation, weighted):
         self.representation = representation()
-        self.weigthed = weigthed
+        self.weighted = weighted
         self.vertices = []
 
     @property
@@ -145,7 +145,7 @@ class AdjacencyMatrix():
             for j in range(0, len(G.vertices)):
                 self.edges[i].append(0)
         for (i, j), w in edge_list:
-            self.edges[i][j] = w if G.weigthed else 1
+            self.edges[i][j] = w if G.weighted else 1
 
     def edges_set(self, G):
         r = []
@@ -199,7 +199,7 @@ class AdjacencyList():
 
     def add_edges(self, G, edge_list):
         for (i, j), w in edge_list:
-            w = w if G.weight else 1
+            w = w if G.weighted else 1
             try:
                 node = self.edges[i]
                 while node.next != None:
@@ -261,7 +261,7 @@ def main():
     for representation in [ AdjacencyMatrix, AdjacencyList ]:
 
         # Cria um grafo com uma representação r
-        G = Graph(representation, weigthed=True)
+        G = Graph(representation, weighted=True)
         print('###############################################################')
         print('# Grafo usando uma {} '.format(
             G.representation.pt_name)
