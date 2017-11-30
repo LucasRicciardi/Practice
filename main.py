@@ -199,6 +199,7 @@ class AdjacencyList():
 
     def add_edges(self, G, edge_list):
         for (i, j), w in edge_list:
+            w = w if G.weight else 1
             try:
                 node = self.edges[i]
                 while node.next != None:
@@ -342,7 +343,6 @@ def main():
         print('# Rodando o Algoritmo de Floyd-Warshall ...')
         print('###############################################################\n')
         distance_matrix = G.floyd_warshall()
-
         print('  ', end='')
         for i in range(0, len(G.vertices)):
             print("  {}  ".format(i), end='')
