@@ -14,7 +14,7 @@ function main()
     end
 
     -- Cria uma equação
-    f = s(10p, 5)
+    f = s(10, 5)
     for i = 0, 100, 1 do
         print(i, f(i))
     end

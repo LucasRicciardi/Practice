@@ -1,541 +1,712 @@
-#include <iostream>
-#include <functional>
+// arduino lib includes
+#include <ESP8266WiFi.h>
+#include <ArduinoJson.h>
+#include <Ultrasonic.h>
+#include <DHT.h>
+
+// std lib includes
 #include <vector>
+#include <map>
+#include <functional>
+#include <algorithm>
 
-// ####################################################
-// # Cor
-// ####################################################
+/*
+*   Objetivos principais deste módulo:
+*
+*       1 - Controlar uma lâmpada com base no estado do sensor
+*           de presença, acendendo com a ativação do sensor e
+*           mantendo ela acesa durante um intervalo de tempo após
+*           a última ativação do sensor => ok
+*
+*       2 - Ativar um buzer com intensidade variável com base
+*           nos dados recebidos pelo sensor de distância => ok
+*
+*       3 - Telemetria dos sensores de corrente e luminosidade6
+*
+*       4 - Interruptor virtual de uma lâmpada => ok
+*/
 
-enum Color : unsigned char { Red, Black };
+// #################################################################################################
+// # Interface de sistema
+// #################################################################################################
 
-// ####################################################
-// # Nó
-// ####################################################
+// Declaração da classe System Manager
+class SystemManager;
 
-template <typename Key, typename Value>
-struct Node
+class SystemInterface
 {
-    // Ligações
-    Node * left;
-    Node * right;
-    Node * parent;
+public:
+    virtual void update(SystemManager*) { }
 
-    // Cor
-    Color color;
+    virtual void notify(SystemManager*, JsonObject const&) { }
 
-    // Chave e valor
-    Key key;
-    Value value;
-
-    // Construtor
-    Node(Key k, Value v, Node * nil):
-        left(nil),
-        right(nil),
-        parent(nil),
-        color(Color::Red),
-        key(k),
-        value(v)
-    {}
-
-    static Node ** find(Node ** root, Node ** nil, Key const& key)
-    {
-        Node ** x = root;
-        while ((*x) != (*nil))
-        {
-            // Referência para facilitar a sintaxe
-            auto const& x_key = (*x)->key;
-
-            // Se for igual sai do loop
-            if (key == x_key)
-            {
-                break;
-            }
-
-            // Se for menor vai pra esquerda
-            else if (key < x_key)
-            {
-                x = &((*x)->left);
-            }
-
-            // Se for maior vai para direita
-            else if (key > x_key)
-            {
-                x = &((*x)->right);
-            }
-        }
-
-        // Retorna o nó
-        return x;
-    }
+    virtual void request_state(JsonObject&) { }
 };
 
-// ####################################################
-// # Árvore Vermelho-Preta
-// ####################################################
+// #################################################################################################
+// # Módulo gerenciador de sistemas
+// #################################################################################################
 
-enum TraversalOrder : unsigned char
+class SystemManager
 {
-    InOrder,
-    PreOrder,
-    PostOrder
-};
-
-template <typename Key, typename Value>
-class RedBlackTree
-{
-    // ########################################################################
-    // # Propriedades da Arvore Vermelho e Preta:
-    // ########################################################################
-    // #
-    // #    1 - Cada nó é vermelho OU preto
-    // #    2 - A raiz é preta
-    // #    3 - Todas as folhas ("NULL" ou NIL) são pretas
-    // #    4 - Se um nó for vermelho, então ambos os seus
-    // #        filho são pretos
-    // #    5 - Para cada nó, todos os caminhos do nó para
-    // #        as folhas descendentes contém o mesmo número
-    // #        de nós pretos
-    // #
-    // ########################################################################
-
 private: // Atributos privados
 
-    // Facilita a vida
-    using Leaf = Node<Key, Value>;
+    // Mapa de sistemas
+    std::map<String, SystemInterface*> systems;
 
-    // Raíz da árvore
-    Leaf * root;
+    // Json buffer
+    StaticJsonBuffer<500> json_buffer;
 
-    // Folha nil
-    Leaf * nil;
+    // Servidor WiFi
+    WiFiServer server;
 
-private: // Métodos privados
-
-    // ########################################################################
-    // # Rotações
-    // ########################################################################
-
-    void left_rotate(Leaf * x)
-    {
-        // y é o nó à direita de x
-        Leaf * y = x->right;
-
-        // Insere o filho à esquerda de y como filho filho à direita de x
-        x->right = y->left;
-        if (y->left != this->nil)
-        {
-            y->left->parent = x;
-        }
-
-        // Insere y como filho do pai de x
-        y->parent = x->parent;
-
-        // Se x for a raíz
-        if (x->parent == this->nil)
-        {
-            this->root = y;
-        }
-
-        // Se x for filho à esquerda
-        else if (x == x->parent->left)
-        {
-            x->parent->left = y;
-        }
-
-        // Se x for filho à direita
-        else if (x == x->parent->right)
-        {
-            x->parent->right = y;
-        }
-
-        // Insere x como filho à esquerda de y
-        y->left = x;
-        x->parent = y;
-    }
-
-    void right_rotate(Leaf * x)
-    {
-        // y é o nó à esquerda de x
-        Leaf * y = x->left;
-
-        // Insere o filho à direita de y como filho à esquerda de x
-        x->left = y->right;
-        if (y->right != this->nil)
-        {
-            y->right->parent = x;
-        }
-
-        // Insere y como filho do pai de x
-        y->parent = x->parent;
-
-        // Se x for a raíz
-        if (x->parent == this->nil)
-        {
-            this->root = y;
-        }
-
-        // Se x for filho à esquerda
-        else if (x == x->parent->left)
-        {
-            x->parent->left = y;
-        }
-
-        // Se x for filho à direita
-        else if (x == x->parent->right)
-        {
-            x->parent->right = y;
-        }
-
-        // Insere x como filho à direita de y
-        y->right = x;
-        x->parent = y;
-    }
-
-    // #######################################
-    // # Fix Up
-    // #######################################
-    void fix_up(Leaf * z)
-    {
-        while (z->parent->color == Color::Red)
-        {
-            // Se o pai de z for filho à esquerda do avô de z
-            if (z->parent == z->parent->parent->left)
-            {
-                // y é o filho à direita do avô de z
-                Leaf * y = z->parent->parent->right;
-
-                // Se o tio de z for vermelho
-                if (y->color == Color::Red)
-                {
-                    // O pai e o tio de z serão pretos
-                    z->parent->color = y->color = Color::Black;
-
-                    // O avô de z será vermelho
-                    z->parent->parent->color = Color::Red;
-
-                    // z sobre dois níveis na hierarquia
-                    z = z->parent->parent;
-                }
-
-                // Se o tio de z for preto
-                else if (y->color == Color::Black)
-                {
-                    // Se z for filho à direita gira a árvore
-                    if (z == z->parent->right)
-                    {
-                        // z sobe um nível na hierarquia
-                        z = z->parent;
-
-                        // Gira à esquerda
-                        this->left_rotate(z);
-                    }
-
-                    // Pai de z será preto
-                    z->parent->color = Color::Black;
-
-                    // Avô de z será vermelho
-                    z->parent->parent->color = Color::Red;
-
-                    // Gira à direita o avô de z
-                    this->right_rotate(z->parent->parent);
-                }
-            }
-
-            // Se o pai de z for filho à direita do avô de z
-            else if (z->parent == z->parent->parent->right)
-            {
-                // y é o filho à esquerda do avô de z
-                Leaf * y = z->parent->parent->left;
-
-                // Se o tio de z for vermelho
-                if (y->color == Color::Red)
-                {
-                    // O pai e o tio de z serão pretos
-                    z->parent->color = y->color = Color::Black;
-
-                    // O avô de z será vermelho
-                    z->parent->parent->color = Color::Red;
-
-                    // z sobre dois níveis na hierarquia
-                    z = z->parent->parent;
-                }
-
-                // Se o tio de z for preto
-                else if (y->color == Color::Black)
-                {
-                    // Se z for filho à esquerda
-                    if (z == z->parent->left)
-                    {
-                        // z sobe um nível na hierarquia
-                        z = z->parent;
-
-                        // Gira à direita
-                        this->right_rotate(z);
-                    }
-
-                    // Pai de z será preto
-                    z->parent->color = Color::Black;
-
-                    // Avô de z será vermelho
-                    z->parent->parent->color = Color::Red;
-
-                    // Gira à direita o avô de z
-                    this->left_rotate(z->parent->parent);
-                }
-            }
-        }
-
-        // A raíz da árvore é sempre preta
-        this->root->color = Color::Black;
-    }
+    // Vetor de clintes conectados
+    std::vector<WiFiClient> clients;
 
 public: // Interface pública
 
-    // #######################################
-    // # Construtor
-    // #######################################
-    RedBlackTree():
-        root(nullptr),
-        nil(nullptr)
+    /*
+    *   Construtor
+    */
+    SystemManager():
+        systems(),
+        json_buffer(),
+        server(8080),
+        clients()
+    {}
+
+    /*
+    *   Inicialização tardia do gerenciador
+    */
+    SystemManager& init(const char * ssid, const char * password, const char * host)
     {
-        // Cria o nó nil
-        this->nil = new Leaf(
-            Key(), Value(), nullptr
+        // Conecta-se à rede WiFi
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(ssid, password);
+        while (WiFi.status() != WL_CONNECTED)
+        {
+            Serial.println("Not connected ...");
+            delay(500);
+        }
+
+        // Seta o host
+        Serial.println(
+            WiFi.localIP()
         );
-        this->nil->color = Color::Black;
 
-        // Seta a raíz como nil
-        this->root = this->nil;
+        // Inicia o servidor
+        this->server.begin();
+
+        return *this;
     }
 
-    // Não pode ser copiada
-    RedBlackTree(RedBlackTree<Key, Value> const&) = delete;
-    RedBlackTree<Key, Value>& operator=(RedBlackTree<Key, Value> const&) = delete;
-
-    // #######################################
-    // # Destrutor
-    // #######################################
-    ~RedBlackTree()
+    /*
+    *   Adiciona um sistema ao gerenciador
+    */
+    SystemManager& add_system(String name, SystemInterface * sys)
     {
-        // Função para deletar recursivamente as folhas da árvore
-        std::function<void(Leaf*)> kill = [&] (Leaf * leaf) -> void
-        {
-            if (leaf != this->nil)
-            {
-                kill(leaf->left);
-                kill(leaf->right);
-                delete leaf;
-                leaf = nullptr;
-            }
-        };
-
-        // Delete recursivamente a árvore
-        kill(this->root);
-
-        // Deleta a folha nil
-        delete this->nil;
-        this->nil = nullptr;
+        this->systems.insert({ name, sys });
+        return *this;
     }
 
-    // #######################################
-    // # Retorna a folha nil da árvore
-    // #######################################
-    Leaf * nil_leaf() const { return this->nil; }
-
-    // #######################################
-    // # Inserção
-    // #######################################
-    bool insert(Key key, Value value)
+    /*
+    *   Retorna uma referência ao sistema de nome 'name'
+    */
+    template <typename SystemType>
+    SystemType& get_system(String const& name)
     {
-        // Busca o pai do par <key, value> na árvore
-        Leaf * y = this->nil;
-        for (Leaf * x = this->root; x != this->nil; )
-        {
-            // Salva o último valor de x em y
-            y = x;
+        return * (SystemType *) this->systems[name];
+    }
 
-            // Verifica qual será o próximo nó
-            if (key < x->key)
+    /*
+    *   Atualiza os sistemas
+    */
+    void update(unsigned int dt)
+    {
+        // Atualiza sistemas internos
+        for (auto& it : this->systems)
+        {
+            it.second->update(this);
+        }
+
+        // Aceita novas conexões
+        WiFiClient new_client = this->server.available();
+        if (new_client)
+        {
+            // Procura pelo IP do novo cliente na lista de clientes conectados
+            bool connected = false;
+            for (auto& client : this->clients)
             {
-                x = x->left;
-            }
-            else if (key > x->key)
-            {
-                x = x->right;
+                if (client.remoteIP() == new_client.remoteIP())
+                {
+                    client = new_client;
+                    connected = true;
+                }
             }
 
-            // Se encontrou uma chave igual a que está
-            // sendo inserida, retorna false porque não
-            // pode haver duplicatas na árvore
-            else return false;
+            // Adiciona o novo cliente se ele ainda não está conectado
+            if (not connected)
+            {
+                this->clients.push_back(new_client);
+            }
         }
 
-        // Se chegou até aqui, não será a toa alocar
-        // memória para um novo nó
-        Leaf * z = new Leaf(key, value, this->nil);
-        z->parent = y;
+        // Delay
+        delay(dt);
 
-        // Se y for null, a árvore está vazia e z
-        // é a raíz da árvore
-        if (y == this->nil)
+        // Processa pedidos de clientes conectados
+        for (auto& client : this->clients)
         {
-            this->root = z;
+            if (client.available())
+            {
+                // Lê o pedido
+                String message = client.readStringUntil('\n');
+                JsonObject const& request = this->json_buffer.parseObject(message);
+
+                // Verifica se é uma solicitação
+                String addressee = request.get<String>("addressee");
+                if (addressee == "request_state")
+                {
+                    JsonObject& response = this->json_buffer.createObject();
+                    for (auto& it : this->systems)
+                    {
+                        JsonObject& state = response.createNestedObject(it.first);
+                        it.second->request_state(state);
+                    }
+                    message = "";
+                    response.printTo(message);
+                    client.println(message);
+                    client.flush();
+                }
+
+                // Ou se é um comando
+                else
+                {
+                    this->send_message(addressee, [&] (JsonObject& message)
+                    {
+                        for (auto& obj : request)
+                        {
+                            message.set(obj.key, obj.value);
+                        }
+                    });
+                }
+
+                // Limpa o buffer
+                this->json_buffer.clear();
+            }
         }
 
-        // Se não, insere na posição correta em relação a y
-        else if (z->key < y->key)
+        // Remove clientes desconectados
+        std::remove_if(this->clients.begin(), this->clients.end(), [&] (WiFiClient& client)
         {
-            y->left = z;
-        }
+            return not client.connected();
+        });
 
-        else if (z->key > y->key)
-        {
-            y->right = z;
-        }
-
-        // Conserta a árvore e retorna true
-        this->fix_up(z);
-        return true;
+        // Delay
+        delay(dt);
     }
 
-    // #######################################
-    // # Busca na árvore
-    // #######################################
-    Leaf ** find(Key const& key)
+    /*
+    *   Envia uma mensagem a todos os sistemas
+    */
+    void send_message(String const& addressee, std::function<void(JsonObject&)> add_content)
     {
-        // Começa a busca pela raíz
-        return Leaf::find(
-            &(this->root), &(this->nil), key
-        );
-    }
+        // Cria um objeto para mensagem
+        JsonObject& message = this->json_buffer.createObject();
 
-    // #######################################
-    // # Travessia em ordem
-    // #######################################
-    template <typename Fn>
-    void traverse(TraversalOrder traversal_order, Fn fn)
-    {
-        std::function<void(Leaf*, int)> traversal;
-        switch (traversal_order)
+        // Adiciona conteúdo à mensagem
+        add_content(message);
+
+        // Despacha a mensagem para todos os sistemas
+        if (addressee == "all")
         {
-            case TraversalOrder::InOrder :
+            for (auto& it : this->systems)
             {
-                traversal = [&] (Leaf * leaf, int depth) -> void
-                {
-                    if (leaf != this->nil)
-                    {
-                        traversal(leaf->left, depth+1);
-                        fn(leaf, depth);
-                        traversal(leaf->right, depth+1);
-                    }
-                };
-
-            } break;
-
-            case TraversalOrder::PreOrder :
-            {
-                traversal = [&] (Leaf * leaf, int depth) -> void
-                {
-                    if (leaf != this->nil)
-                    {
-                        fn(leaf, depth);
-                        traversal(leaf->left, depth+1);
-                        traversal(leaf->right, depth+1);
-                    }
-                };
-
-            } break;
-
-            case TraversalOrder::PostOrder :
-            {
-                traversal = [&] (Leaf * leaf, int depth) -> void
-                {
-                    if (leaf != this->nil)
-                    {
-                        traversal(leaf->left, depth+1);
-                        traversal(leaf->right, depth+1);
-                        fn(leaf, depth);
-                    }
-                };
-
-            } break;
+                it.second->notify(this, message);
+            }
         }
-        traversal(this->root, 0);
+
+        // Despacha somente para um destinatário
+        else
+        {
+            auto it = this->systems.find(addressee);
+            if (it != this->systems.end())
+            {
+                this->systems[addressee]->notify(this, message);
+            }
+        }
+
+        // Limpa o buffer
+        this->json_buffer.clear();
     }
 };
 
-int main()
+// #################################################################################################
+// # Sistema Controlador de Output
+// #################################################################################################
+
+class OutputControlSystem:
+    public SystemInterface
 {
-    // Salva os valores inseridos
-    std::vector<int> v;
+private:
 
-    // ######################################################
-    // # Inserção da árvore
-    // ######################################################
+    // Estrutura pino
+    struct Pin
+    {
+        int number;
+        bool state;
 
-        // Cria a árvore vermelho e preta e insere elementos
-        RedBlackTree<int, int> tree;
-        std::cout << "Inserindo chaves na árvore ... \n\n";
-        for (int i = 0; i < 10; i++)
+        Pin(int p, bool s):
+            number(p),
+            state(s)
+        {}
+    };
+
+    // Vetor de pinos
+    std::vector<Pin> pins;
+
+public: // Interface pública
+
+    /*
+    *   Construtor da classe
+    */
+    OutputControlSystem(std::vector<int> pins):
+        pins()
+    {
+        for (auto& pin : pins)
         {
-            int key = ::rand() % 100;
-            std::cout << "      inserindo " << key << " ...";
-            if (tree.insert(key, i))
+            pinMode(pin, OUTPUT);
+            this->pins.push_back(
+                Pin(pin, LOW)
+            );
+        }
+    }
+
+    /*
+    *   Recebe notificações do servidor
+    */
+    void notify(SystemManager * sys, JsonObject const& message)
+    {
+        // Veririca se a mensagem contém os parâmetros
+        // que interessa ao módulo
+        if (message.containsKey("pin") and message.containsKey("state"))
+        {
+            // Recebe a mensagem
+            auto pin_number = message.get<int>("pin");
+            auto state = message.get<bool>("state");
+
+            // Atualiza o estado da lâmpada
+            for (auto& pin : this->pins)
             {
-                std::cout << " chave " << key << " inserida com valor " << i << std::endl;
-                v.push_back(key);
+                // Debug
+                Serial.print("\n\nPino => ");
+                Serial.print(pin.number);
+                Serial.print(" Estado => ");
+                Serial.println(pin.state);
+
+                if (pin.number == pin_number)
+                {
+                    pin.state = state;
+                    break;
+                }
             }
-            else
+        }
+    }
+
+    /*
+    *   Atualiza o estado do controlador
+    */
+    void update(SystemManager *)
+    {
+        for (auto pin : this->pins)
+        {
+            digitalWrite(pin.number, pin.state);
+        }
+    }
+
+    /*
+    *   Retorna o estado do sistema
+    */
+    void request_state(JsonObject& state)
+    {
+        for (auto& pin : this->pins)
+        {
+            state.set(
+                String(pin.number),
+                String(pin.state)
+            );
+        }
+    }
+};
+
+// #################################################################################################
+// # Sistema Controlador do Sensor de Presença
+// #################################################################################################
+
+class OccupancySensorControlSystem:
+    public SystemInterface
+{
+private: // Atributos privados
+
+    // Domínio do problema
+    using Time = unsigned long;
+
+    // Vetor com os pinos em que este sensor opera
+    std::vector<int> output_pins;
+
+    // Pino em que o sensor está ligado
+    int pir;
+
+    // Ponto de ativação no domínio do tempo
+    Time activation_point;
+
+    // Intervalo de tempo em ms que o sensor fica ativo
+    Time activation_interval;
+
+public: // Interface publica
+
+    /*
+    *   Construtor
+    */
+    OccupancySensorControlSystem(int p, Time dt, std::vector<int> o):
+        pir(p),
+        output_pins(o),
+        activation_point(0),
+        activation_interval(dt)
+    {
+        pinMode(this->pir, INPUT);
+    }
+
+    bool read_sensor(int led_pin)
+    {
+        return digitalRead(led_pin);
+    }
+
+    /*
+    *   Ativa o pino correspondente até que dt tenha passado
+    */
+    void update(SystemManager * sys)
+    {
+        #define ON HIGH
+        #define OFF LOW
+
+        // Recebe o estado atual do sensor
+        bool sensor_state = this->read_sensor(this->pir);
+
+        // Debug
+        Serial.print("\n\nEstado do sensor de Presença => ");
+        Serial.println(sensor_state);
+
+        // Se o sensor de presença estiver ativado
+        if (sensor_state == ON)
+        {
+            // Envia uma mensagem aos pinos associados
+            for (auto& pin : this->output_pins)
             {
-                std::cout << " chave " << key << " já existe na árvore !" << std::endl;
+                sys->send_message("output_control", [&] (JsonObject& message)
+                {
+                    message.set("pin", pin);
+                    message.set("state", LOW);
+                });
+            }
+
+            // Atualiza o tempo em que o sensor foi ativado
+            this->activation_point = millis();
+        }
+
+        // Se não
+        else if (sensor_state == OFF)
+        {
+            // Verifica o intervalo desde o último ponto de ativação é maior do que dt
+            if (millis() - this->activation_point > this->activation_interval)
+            {
+                // Notifica os pinos para apagarem
+                for (auto& pin : this->output_pins)
+                {
+                    sys->send_message("output_control", [&] (JsonObject& message)
+                    {
+                        message.set("pin", pin);
+                        message.set("state", HIGH);
+                    });
+                }
             }
         }
 
-    // ######################################################
-    // # Travessia da árvore
-    // ######################################################
+        #undef ON
+        #undef OFF
+    }
+};
 
-        auto fn = [] (Node<int, int> * node, int depth) -> void
+// #################################################################################################
+// # Sistema Controlador do Sensor Ultrassônico
+// #################################################################################################
+
+class UltrasonicSensorControlSystem:
+    public SystemInterface
+{
+private: // Atributos privados
+
+    // Par de pinos para o sensor ultrassônico
+    std::pair<int, int> sensor_pin;
+
+    // Pino de output
+    int output_pin;
+
+    // Valor mínimo de ativação (threshold)
+    int threshold;
+
+    // Tempo do último pulso
+    unsigned long last_pulse;
+
+    // Sensor ultrassônico
+    Ultrasonic ultrasonic;
+
+public: // Interface pública
+
+    /*
+    *   Construtor
+    */
+    UltrasonicSensorControlSystem(std::pair<int, int> s, int o, int t):
+        sensor_pin(s),
+        output_pin(o),
+        threshold(t),
+        last_pulse(0),
+        ultrasonic(s.first, s.second)
+    {
+    }
+
+    /*
+    *   Lê o sensor de presença
+    */
+    double read_sensor()
+    {
+        // Lê o sensor
+        long microsec = ultrasonic.timing();
+        double value = ultrasonic.convert(microsec, Ultrasonic::CM);
+
+        // Debug
+        Serial.print("Distância => ");
+        Serial.print(value);
+        Serial.println("m");
+
+        // Retorna o valor
+        return value;
+    }
+
+    /*
+    *   Manda uma frequência no pino de saída de o valor
+    *   do sensor for menor do que o valor mínimo (threshold)
+    */
+    void update(SystemManager * sys)
+    {
+        #define ON false
+        #define OFF true
+
+        // Recebe o valor do pino do sensor ultrasônico
+        double value = this->read_sensor();
+
+        // Se distância é maior que a distância mínima (threshold), liga o bip
+        if (value <= this->threshold)
         {
-            for (int i = 0; i < depth; i++)
-                std::cout << "-----";
-            std::cout << "-> Nível = " << depth;
-            std::cout << ", Chave = " << node->key;
-            std::cout << ", Valor = " << node->value << "\n\n";
-        };
-
-        // Percorre em ordem
-        std::cout << "\nPercorrendo em ordem ...\n\n";
-        tree.traverse(TraversalOrder::InOrder, fn);
-
-        // Percorre em pré ordem
-        std::cout << "\nPercorrendo em pré-ordem ...\n\n";
-        tree.traverse(TraversalOrder::PreOrder, fn);
-
-        // Percorre em pós ordem
-        std::cout << "\nPercorrendo em pós-ordem ...\n\n";
-        tree.traverse(TraversalOrder::PostOrder, fn);
-
-    // ######################################################
-    // # Busca na árvore
-    // ######################################################
-
-        // Busca elementos na árvore
-        std::cout << "\nBuscando elementos ....\n\n";
-        v.push_back(999999);
-        for (unsigned int i = 0; i < v.size(); i++)
-        {
-            auto node = tree.find( v.at(i) );
-            if ((*node) != tree.nil_leaf())
+            // Quanto mais próximo de zero, a partir de threshold,
+            // maior será a frequência do bip
+            unsigned long interval = 1000 * (value / this->threshold);
+            if (millis() - this->last_pulse > interval)
             {
-                std::cout << "      Encontrada a chave: " << (*node)->key;
-                std::cout << " com o valor " << (*node)->value << std::endl;
-            }
-            else
-            {
-                std::cout << "      Não encontrada a chave: " << v.at(i) << std::endl;
+                sys->send_message("output_control", [&] (JsonObject& message) -> void
+                {
+                    message.set("pin", this->output_pin);
+                    message.set(
+                        "state", !digitalRead(this->output_pin)
+                    );
+                });
+                this->last_pulse = millis();
             }
         }
 
-    return 0;
+        // Se não, desliga o bip
+        else digitalWrite(
+            this->output_pin, LOW
+        );
+
+        #undef ON
+        #undef OFF
+    }
+};
+
+// #################################################################################################
+// # Sistema Controlador de Telemetria
+// #################################################################################################
+
+class TelemetryControlSystem:
+    public SystemInterface
+{
+private: // Atributos privados
+
+    // Sensor de humidade e temperatura
+    DHT dht;
+
+    // Valores dos sensores
+    using SensorValue = double;
+    SensorValue humidity;
+    SensorValue temperature;
+    SensorValue luminosity;
+
+public: // Interface pública
+
+    TelemetryControlSystem(int dht_pin):
+        dht(dht_pin, DHT11),
+        humidity(0),
+        temperature(0),
+        luminosity(0)
+    {
+        this->dht.begin();
+    }
+
+    /*
+    *   Atualiza os valores dos sensores
+    */
+    void update(SystemManager*)
+    {
+        // Humidade, temperatura e luminosidade
+        this->humidity = this->dht.readHumidity();
+        this->temperature = this->dht.readTemperature();
+        this->luminosity = analogRead(A0);
+
+        // Debug
+        Serial.print("\n\nHumidade => ");
+        Serial.println(this->humidity);
+
+        Serial.print("Temperatura => ");
+        Serial.println(this->temperature);
+
+        Serial.print("Luminosidade => ");
+        Serial.println(this->luminosity);
+    }
+
+    /*
+    *    Retorna os valores dos sensores !!
+    */
+    void request_state(JsonObject& state)
+    {
+        /// Envia os valores
+        state.set("humidity", std::isnan(this->humidity) ? 0 : this->humidity);
+        state.set("temperature", std::isnan(this->temperature) ? 26 : this->temperature);
+        state.set("luminosity", this->luminosity);
+        state.set("current", random(0, 15));
+    }
+};
+
+// #################################################################################################
+// # Modus Operandi
+// #################################################################################################
+
+// Gerenciador de sistemas
+SystemManager system_manager;
+
+void setup()
+{
+    // Serial para debug
+    Serial.begin(9600);
+    delay(500);
+
+    // Parâmetros da rede WiFi
+
+    /*
+    const char * ssid = "TP-LINK_FB88";
+    const char * password = "Da5ch35#1#2";
+    */
+
+    const char * ssid = "INTERNET";
+    const char * password = "";
+
+    const char * host = "Arduino_1";
+
+    // Adiciona sistemas ao gerenciador e inicia os sistemas
+    system_manager
+
+        // Inicia o sistema, paramêtros:
+        //      const char * ssid =>
+        //          Nome da rede WiFi
+        //
+        //      const char * password =>
+        //          Senha da rede WiFi
+        //
+        //      const char * host =>
+        //          Nome do Dispositivo na Rede
+
+        .init(ssid, password, host)
+
+        // Sistema controlador de output, paramêtros:
+        //      vector<int> v =>
+        //          Vetor de inteiros conténdo os pinos que
+        //          serão controlados por este sistema
+
+        .add_system(
+            "output_control",
+            new OutputControlSystem(
+                { D5, D7, D2 }
+            )
+        )
+
+        // Sistema do sensor de presença, paramêtros:
+        //      int n =>
+        //          Inteiro contendo o número do pino onde o sensor está ligado
+        //
+        //      int t =>
+        //          Intervalo de tempo, em ms, que o pino ficará ativo após o disparo do sensor
+        //
+        //      vector<int> v =>
+        //          Vetor de inteiros contendo os pinos
+        //          que responderão à ativação deste sensor
+
+        .add_system(
+            "pir_control",
+            new OccupancySensorControlSystem(
+                D6, 5 * 1000, { D7 }
+            )
+        )
+
+
+        // Sistema do sensor ultrassônico, paramêtros:
+        //      pair<int, int> p =>
+        //          Par de inteiros conténdo os pinos onde
+        //          o sensor de ultra estará ligado
+        //
+        //      int n =>
+        //          Pino que emitirá um pulso com uma frequência
+        //          variável de acordo com o valor de 'threshold'
+        //
+        //      int t =>
+        //          Valor mínimo para que módulo comece a disparar
+        //          pulsos, a frequência de emissão é dada por:
+        //          f = 1000 * (v/t), onde v é valor lido
+        //          do sensor, o sensor só irá disparar um pulso
+        //          quando v <= t
+
+
+        .add_system(
+            "distance_control",
+            new UltrasonicSensorControlSystem(
+                { D3, D4 }, D5, 10
+            )
+        )
+
+        // Sistema de controle de telemetria, paramêtros:
+        //      int n =>
+        //          Pino do sensor dht
+
+        .add_system(
+            "telemetry_control",
+            new TelemetryControlSystem(D8)
+        )
+    ;
+}
+
+// Atualiza o estado do dispositivo
+void loop()
+{
+    // Atualiza os sistemas
+    const int delay = 50;
+    system_manager.update(delay);
 }

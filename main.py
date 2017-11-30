@@ -1,122 +1,354 @@
 # -*- coding: utf-8 -*-
 
-import collections
-import logging
+import math
 
-import pygame
+#######################################################################
+# Função que imprime o grafo com valores das distâncias  os caminhos
+#######################################################################
 
-#########################################################################################
-# Sistemas
-#########################################################################################
+def show_results(G, u):
+    print('\nResultados da busca pelos caminhos mais curtos ...')
+    print('Source (raíz) = {}'.format(u.value))
+    for v in sorted(G.V, key=lambda v: v.value):
+        print('Nó: {}, Distância mínima: {}, Caminho: '.format(v.value, v.distance), end='')
+        p = v
+        if p.parent == None:
+            if p.value == u.value:
+                print('Este é o nó raíz', end='')
+            else:
+                print('Não existe caminho !', end='')
+        else:
+            q = []
+            while p != None:
+                q.append(p.value)
+                p = p.parent
+            while len(q) > 0:
+                print(q.pop(), end='')
+                if len(q) > 0:
+                    print(' --> ', end='')
+        print('')
+    print('')
 
-class System():
+#######################################################################
+# Grafo
+#######################################################################
 
-    def init(self, world):
-        pass
+class Graph():
 
-    def update(self, world, debug):
-        pass
+    class Node():
 
-    def close(self, world):
-        pass
+        def __init__(self, value):
+            self.value = value
+            self.distance = 0
+            self.parent = None
 
+    def __init__(self, representation, weigthed):
+        self.representation = representation()
+        self.weigthed = weigthed
+        self.V = []
 
-#########################################################################################
-# Mundo
-#########################################################################################
+    @property
+    def E(self):
+        return self.representation.edges_list()
 
-class World():
+    def debug(self):
+        print('Nós: ', end='')
+        for u in self.V:
+            print('{} '.format(u.value), end='')
+        print('\n')
+        self.representation.debug()
 
-    CONTROL_SYSTEM = 0
-    UPDATE_SYSTEM = 1
-    RENDER_SYSTEM = 2
+    def add_nodes(self, node_list):
+        for node in node_list:
+            self.V.append(
+                Graph.Node(node)
+            )
 
-    def __init__(self, size):
-        # Dimensões do 'mundo'
-        self.size = (self.w, self.h) = size
+    def add_edges(self, edge_list):
+        self.representation.add_edges(self, edge_list)
 
-        # Sistemas
-        self.control_systems = collections.OrderedDict()
-        self.update_systems = collections.OrderedDict()
-        self.render_systems = collections.OrderedDict()
-        self.systems = collections.ChainMap(
-            self.control_systems,
-            self.update_systems,
-            self.render_systems
-        )
+    def edges(self):
+        for edge in self.representation.edges_set(self):
+            yield edge
 
-        # Objetos
-        self.objects = []
+    def neighbours(self, u):
+        return self.representation.neighbours(self, u)
 
-        # logger
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s %(name)s => %(message)s',
-            datefmt='[%H:%M:%S]'
-        )
-        self.logger = logging.getLogger(self.__class__.__name__)
+    def weight(self, u, v):
+        return self.representation.weight(u, v)
 
-    def add_system(self, name, system, system_type):
-        # Sistemas de controle (input)
-        if system_type is World.CONTROL_SYSTEM:
-            self.control_systems[name] = system
+    #############################################################################
+    # Algoritmos de Dijkstra, Bellman-Ford e Floyd-Warshall
+    #############################################################################
 
-        # Sistemas de atualização
-        elif system_type is World.UPDATE_SYSTEM:
-            self.update_systems[name] = system
+    def dijkstra(self, s):
+        for u in self.V:
+            u.distance = math.inf
+            u.parent =  None
+        s.distance = 0
+        S = []
+        Q = [ u for u in self.V ]
+        while len(Q) > 0:
+            u = min(Q, key=lambda v: v.distance)
+            S.append(u)
+            for v in self.neighbours(u):
+                if v.distance > u.distance + self.weight(u, v):
+                    v.distance = u.distance + self.weight(u, v)
+                    v.parent = u
+            Q.remove(u)
 
-        # Sistemas de amostragem (output)
-        elif system_type is World.RENDER_SYSTEM:
-            self.render_systems[name] = system
+    def bellman_ford(self, s):
+        for u in self.V:
+            u.distance = math.inf
+            u.parent = None
+        s.distance = 0
+        for i in range(0, len(self.V)):
+            for (u, v) in self.edges():
+                if v.distance > u.distance + self.weight(u, v):
+                    v.distance = u.distance + self.weight(u, v)
+                    v.parent = u
+        for (u, v) in self.edges():
+            if v.distance > u.distance + self.weight(u, v):
+                return False
+        return True
 
-    def start_simulation(self, debug=False):
-        # Inicia todos os sistemas
-        self.logger.info('Iniciando sistemas ...')
-        for system in self.systems.values():
-            self.logger.info('Iniciando sistema: {}'.format(system.__class__.__name__))
-            system.init(self)
-        self.logger.info('Sistemas inicializados ...')
+    def floyd_warshall(self):
+        dist = [ [ math.inf for _ in range(0, len(self.V)) ] for _ in range(0, len(self.V)) ]
+        for (u, v) in self.edges():
+            dist[u.value][v.value] = self.weight(u, v)
+        for k in range(0, len(self.V)):
+            for i in range(0, len(self.V)):
+                for j in range(0, len(self.V)):
+                    if dist[i][j] > dist[i][k] + dist[k][j]:
+                        dist[i][j] = dist[i][k] + dist[k][j]
+        for i in range(0, len(self.V)):
+            dist[i][i] = math.inf
+        return dist
 
-        # Atualiza os sistemas
-        self.logger.info('Iniciando simulação ...')
-        self.done = False
-        while not self.done:
+#######################################################################
+# Grafo usando Matriz de Adjacência
+#######################################################################
+
+class AdjacencyMatrix():
+
+    def __init__(self):
+        self.edges = []
+        self.pt_name = 'Matriz de Adjacência'
+
+    def add_edges(self, G, edge_list):
+        self.edges = []
+        for i in range(0, len(G.V)):
+            self.edges.append([])
+            for j in range(0, len(G.V)):
+                self.edges[i].append(0)
+        for (i, j), w in edge_list:
+            self.edges[i][j] = w if G.weigthed else 1
+
+    def edges_set(self, G):
+        r = []
+        for i in range(0, len(self.edges)):
+            for j in range(0, len(self.edges)):
+                if self.edges[i][j] > 0:
+                    r.append([ G.V[i],G.V[j] ])
+        return r
+
+    def neighbours(self, G, u):
+        r = []
+        for n, w in enumerate(self.edges[u.value]):
+            if n == u:
+                pass
+            else:
+                if w > 0:
+                    r.append(G.V[n])
+        return r
+
+    def weight(self, u, v):
+        return self.edges[u.value][v.value]
+
+    def debug(self):
+        print('Arestas: ')
+        for i in range(len(self.edges)):
+            for j in range(len(self.edges[i])):
+                print('[{}]'.format(
+                    self.edges[i][j]
+                ), end='')
+            print('')
+        print('')
+
+#######################################################################
+# Grafo usando Lista de Adjacência
+#######################################################################
+
+class AdjacencyList():
+
+    class Node():
+
+        def __init__(self, node, weight):
+            self.node = node
+            self.weight = weight
+            self.next = None
+
+    def __init__(self):
+        self.edges = []
+        self.pt_name = 'Lista de Adjacência'
+
+    def add_edges(self, G, edge_list):
+        for (i, j), w in edge_list:
             try:
-                # Primeiro os sistemas de controle
-                for system in self.control_systems.values():
-                    system.update(self, debug)
+                node = self.edges[i]
+                while node.next != None:
+                    node = node.next
+                node.next = AdjacencyList.Node(G.V[j], w)
+            except IndexError:
+                self.edges.append(
+                    AdjacencyList.Node(G.V[j], w)
+                )
 
-                # Depois os sistemas de atualização
-                for system in self.update_systems.values():
-                    system.update(self, debug)
+    def edges_set(self, G):
+        r = []
+        for n, edge in enumerate(self.edges):
+            node = edge
+            while node != None:
+                r.append( [ G.V[n], node.node ])
+                node = node.next
+        return r
 
-                # Por último os sistemas de renderização
-                for system in self.render_systems.values():
-                    system.update(self, debug)
+    def neighbours(self, G, u):
+        r = []
+        node = self.edges[u.value]
+        while node != None:
+            r.append(node.node)
+            node = node.next
+        return r
 
-            except KeyboardInterrupt:
-                self.logger.info('Simulação interrompida por "Ctrl+C"')
-                self.done = True
+    def weight(self, u, v):
+        node = self.edges[u.value]
+        while node != None:
+            if node.node == v:
+                return node.weight
+            node = node.next
 
-        # Encerra os sistemas
-        self.logger.info('Encerrando os sistemas ...')
-        for system in self.systems.values():
-            system.close(self)
-        self.logger.info('Encerrando a simulação ...')
+    def debug(self):
+        print('Arestas: ')
+        for n, edge in enumerate(self.edges):
+            print('({}, {}) --> '.format(n, 0), end='')
+            node = edge
+            while node != None:
+                print('({}, {})'.format(node.node.value, node.weight), end='')
+                if node.next != None:
+                    print(' --> ', end='')
+                node = node.next
+            print('')
+        print('')
+
+###################################################################################
+# Driver
+###################################################################################
 
 def main():
-    # Cria um objeto 'mundo'
-    world = World(size=(640, 480))
+    # Referência para a implementação
+    # https://www.cs.usfca.edu/~galles/visualization/Dijkstra.html
+    # - Undirected Graph - Small Graph
 
-    # Adiciona sistemas ao mundo
+    for representation in [ AdjacencyMatrix ]:
 
-    # Sistemas de input
-    world.add_system('event', EventSystem(), world.CONTROL_SYSTEM)
+        # Cria um grafo com uma representação r
+        G = Graph(representation, weigthed=True)
+        print('###############################################################')
+        print('# Grafo usando uma {} '.format(
+            G.representation.pt_name)
+        )
+        print('###############################################################\n')
 
-    # Sistemas de output
-    world.add_system('render', RenderSystem(), world.RENDER_SYSTEM)
+        # Adiciona nós e arestas com peso ao grafo
+        G.add_nodes([ i for i in range(8) ])
+        G.add_edges([
 
-    world.start_simulation(debug=True)
+            # Arestas com origem em 0
+            [ (0, 1), 5 ],
+            [ (0, 2), 4 ],
+            [ (0, 3), 2 ],
+
+            # Arestas com origem em 1
+            [ (1, 0), 5 ],
+            [ (1, 2), 1 ],
+            [ (1, 5), 6 ],
+
+            # Arestas com origem em 2
+            [ (2, 0), 4 ],
+            [ (2, 1), 1 ],
+            [ (2, 4), 6 ],
+            [ (2, 5), 9 ],
+            [ (2, 6), 5 ],
+
+            # Arestas com origem em 3
+            [ (3, 0), 2 ],
+            [ (3, 7), 4 ],
+
+            # Arestas com origem em 4
+            [ (4, 2), 6 ],
+            [ (4, 6), 4 ],
+            [ (4, 7), 4 ],
+
+            # Arestas com origem em 5
+            [ (5, 1), 6 ],
+            [ (5, 2), 9 ],
+            [ (5, 6), 6 ],
+
+            # Arestas com origem em 6
+            [ (6, 2), 5 ],
+            [ (6, 4), 4 ],
+            [ (6, 5), 6 ],
+            [ (6, 7), 3 ],
+
+            # Arestas com origem em 7
+            [ (7, 3), 4 ],
+            [ (7, 4), 4 ],
+            [ (7, 6), 3 ],
+        ])
+
+        # Debug
+        print('Debug da representação deste grafo')
+        G.debug()
+
+        # Roda o Algoritmo de Dijkstra em todos os vértices
+        print('###############################################################')
+        print('# Rodando o Algoritmo de Dijkstra em todos os vértices ...')
+        print('###############################################################\n')
+        for u in G.V:
+            G.dijkstra(u)
+            show_results(G, u)
+
+        # Roda o Algoritmo de Bellman-Ford
+        print('###############################################################')
+        print('# Rodando o Algoritmo de Bellman-Ford em todos os vértices ...')
+        print('###############################################################\n')
+        for u in G.V:
+            if G.bellman_ford(u) == True:
+                print('G não contém ciclos negativos')
+            else:
+                print('G contém ciclos negativos')
+            show_results(G, u)
+
+        # Roda o Algoritmo de Floyd-Warshall
+        print('###############################################################')
+        print('# Rodando o Algoritmo de Floyd-Warshall ...')
+        print('###############################################################\n')
+        distance_matrix = G.floyd_warshall()
+
+        print('  ', end='')
+        for i in range(0, len(G.V)):
+            print("  {}  ".format(i), end='')
+        print('')
+        for n, row in enumerate(distance_matrix):
+            print('{} '.format(n), end='')
+            for line in row:
+                if isinstance(line, float):
+                    msg = '[{}]'
+                else:
+                    msg = '[{0:3d}]'
+                print(msg.format(line), end='')
+            print('')
 
 if __name__ == '__main__':
     main()
