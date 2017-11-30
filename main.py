@@ -250,7 +250,7 @@ def main():
     # https://www.cs.usfca.edu/~galles/visualization/Dijkstra.html
     # - Undirected Graph - Small Graph
 
-    for representation in [ AdjacencyMatrix ]:
+    for representation in [ AdjacencyMatrix, AdjacencyList ]:
 
         # Cria um grafo com uma representação r
         G = Graph(representation, weigthed=True)
