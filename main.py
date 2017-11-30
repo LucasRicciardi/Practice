@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import math
+import time
 
 #######################################################################
 # Função que imprime o grafo com valores das distâncias  os caminhos
@@ -30,6 +31,17 @@ def show_results(G, u):
     print('')
 
 #######################################################################
+# Função calcula o tempo que o algoritmo levou
+#######################################################################
+
+def evalute_time(algorithm, *args):
+    begin = time.time()
+    res = algorithm(*args)
+    end = time.time()
+    print('Tempo : {:2f}s \n'.format(end-begin))
+    return res
+
+#######################################################################
 # Grafo
 #######################################################################
 
@@ -47,10 +59,6 @@ class Graph():
         self.weighted = weighted
         self.vertices = []
 
-    @property
-    def E(self):
-        return self.representation.edges_list()
-
     def debug(self):
         print('Nós: ', end='')
         for u in self.vertices:
@@ -58,10 +66,10 @@ class Graph():
         print('\n')
         self.representation.debug()
 
-    def add_nodes(self, node_list):
-        for node in node_list:
+    def add_vertex(self, vertex_list):
+        for vertex in vertex_list:
             self.vertices.append(
-                Graph.Node(node)
+                Graph.Node(vertex)
             )
 
     def add_edges(self, edge_list):
@@ -269,7 +277,7 @@ def main():
         print('###############################################################\n')
 
         # Adiciona nós e arestas com peso ao grafo
-        G.add_nodes([ i for i in range(8) ])
+        G.add_vertex([ i for i in range(8) ])
         G.add_edges([
 
             # Arestas com origem em 0
@@ -324,7 +332,7 @@ def main():
         print('# Rodando o Algoritmo de Dijkstra em todos os vértices ...')
         print('###############################################################\n')
         for u in G.vertices:
-            G.dijkstra(u)
+            evalute_time(G.dijkstra, u)
             show_results(G, u)
 
         # Roda o Algoritmo de Bellman-Ford
@@ -332,7 +340,8 @@ def main():
         print('# Rodando o Algoritmo de Bellman-Ford em todos os vértices ...')
         print('###############################################################\n')
         for u in G.vertices:
-            if G.bellman_ford(u) == True:
+            result = evalute_time(G.bellman_ford, u)
+            if result == True:
                 print('G não contém ciclos negativos')
             else:
                 print('G contém ciclos negativos')
@@ -342,7 +351,7 @@ def main():
         print('###############################################################')
         print('# Rodando o Algoritmo de Floyd-Warshall ...')
         print('###############################################################\n')
-        distance_matrix = G.floyd_warshall()
+        distance_matrix = evalute_time(G.floyd_warshall)
         print('  ', end='')
         for i in range(0, len(G.vertices)):
             print("  {}  ".format(i), end='')
