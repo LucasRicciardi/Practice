@@ -1,712 +1,800 @@
-// arduino lib includes
-#include <ESP8266WiFi.h>
-#include <ArduinoJson.h>
-#include <Ultrasonic.h>
-#include <DHT.h>
+// std io
+#include <iostream>
+#include <iomanip>
 
-// std lib includes
+// numeric limits
+#include <limits>
+
+// assert
+#include <assert.h>
+
+// std container libs
 #include <vector>
 #include <map>
-#include <functional>
-#include <algorithm>
+#include <list>
 
-/*
-*   Objetivos principais deste módulo:
-*
-*       1 - Controlar uma lâmpada com base no estado do sensor
-*           de presença, acendendo com a ativação do sensor e
-*           mantendo ela acesa durante um intervalo de tempo após
-*           a última ativação do sensor => ok
-*
-*       2 - Ativar um buzer com intensidade variável com base
-*           nos dados recebidos pelo sensor de distância => ok
-*
-*       3 - Telemetria dos sensores de corrente e luminosidade6
-*
-*       4 - Interruptor virtual de uma lâmpada => ok
-*/
+// #####################################################################
+// # Funções Auxiliares
+// #####################################################################
 
-// #################################################################################################
-// # Interface de sistema
-// #################################################################################################
+// #####################################################################
+// # Estrutura Vértice e Estrutura Aresta
+// #####################################################################
 
-// Declaração da classe System Manager
-class SystemManager;
+// Facilita a vida
+using Vertex = unsigned int;
+using Distance = long int;
+using Connected = bool;
 
-class SystemInterface
+struct Edge
 {
-public:
-    virtual void update(SystemManager*) { }
+    // Facilita a vida
+    using VertexPair = std::pair<Vertex, Vertex>;
+    using Weight = long int;
+    using List = std::vector< std::pair< VertexPair, Weight > >;
 
-    virtual void notify(SystemManager*, JsonObject const&) { }
+    // Par de vértices que compoe a aresta
+    VertexPair vertex_pair;
 
-    virtual void request_state(JsonObject&) { }
-};
+    // Peso da aresta
+    Weight weight;
 
-// #################################################################################################
-// # Módulo gerenciador de sistemas
-// #################################################################################################
-
-class SystemManager
-{
-private: // Atributos privados
-
-    // Mapa de sistemas
-    std::map<String, SystemInterface*> systems;
-
-    // Json buffer
-    StaticJsonBuffer<500> json_buffer;
-
-    // Servidor WiFi
-    WiFiServer server;
-
-    // Vetor de clintes conectados
-    std::vector<WiFiClient> clients;
-
-public: // Interface pública
+    // Conexão entre os vertices
+    Connected connected;
 
     /*
     *   Construtor
     */
-    SystemManager():
-        systems(),
-        json_buffer(),
-        server(8080),
-        clients()
+    Edge(VertexPair p = { 0, 0 }, Weight w = 0, Connected c = false):
+        vertex_pair(p),
+        weight(w),
+        connected(c)
+    {}
+};
+
+// Peso infinito
+constexpr Edge::Weight infinity = 999999;
+
+// Nenhum pai
+constexpr Vertex none = std::numeric_limits<Vertex>::max();
+
+// #####################################################################
+// # Interface de Grafo
+// #####################################################################
+
+class IGraph
+{
+private: // Atributos privados
+
+protected: // Interface para subclasses
+
+    /*
+    *   Construtor
+    */
+    IGraph()
     {}
 
     /*
-    *   Inicialização tardia do gerenciador
+    *   Destrutor
     */
-    SystemManager& init(const char * ssid, const char * password, const char * host)
-    {
-        // Conecta-se à rede WiFi
-        WiFi.mode(WIFI_STA);
-        WiFi.begin(ssid, password);
-        while (WiFi.status() != WL_CONNECTED)
-        {
-            Serial.println("Not connected ...");
-            delay(500);
-        }
+    virtual ~IGraph()
+    {}
 
-        // Seta o host
-        Serial.println(
-            WiFi.localIP()
-        );
+public: // Interface pública
 
-        // Inicia o servidor
-        this->server.begin();
+};
 
-        return *this;
-    }
+// #####################################################################
+// # Grafo Estático, usado quando o número de vértices é conhecido
+// # e, consequentemente, resolvido em tempo de compilação.
+// # Implementado usando uma matriz de adjacência.
+// #####################################################################
+
+template <Vertex num_of_vertexes>
+class StaticGraph
+{
+private: // Atributos privados
+
+    // Número de vértices é conhecido de antemão
+    using AdjacencyMatrix = std::vector< std::vector<Edge> >;
+    AdjacencyMatrix edges;
+
+public: // Interface pública
 
     /*
-    *   Adiciona um sistema ao gerenciador
+    *   Construtor
     */
-    SystemManager& add_system(String name, SystemInterface * sys)
+    StaticGraph():
+        edges()
     {
-        this->systems.insert({ name, sys });
-        return *this;
-    }
-
-    /*
-    *   Retorna uma referência ao sistema de nome 'name'
-    */
-    template <typename SystemType>
-    SystemType& get_system(String const& name)
-    {
-        return * (SystemType *) this->systems[name];
-    }
-
-    /*
-    *   Atualiza os sistemas
-    */
-    void update(unsigned int dt)
-    {
-        // Atualiza sistemas internos
-        for (auto& it : this->systems)
+        this->edges.resize(this->vertexes());
+        for (Vertex i = 0; i < this->vertexes(); i++)
         {
-            it.second->update(this);
-        }
-
-        // Aceita novas conexões
-        WiFiClient new_client = this->server.available();
-        if (new_client)
-        {
-            // Procura pelo IP do novo cliente na lista de clientes conectados
-            bool connected = false;
-            for (auto& client : this->clients)
+            this->edges[i].resize(this->vertexes());
+            for (Vertex j = 0; j < this->vertexes(); j++)
             {
-                if (client.remoteIP() == new_client.remoteIP())
-                {
-                    client = new_client;
-                    connected = true;
-                }
-            }
-
-            // Adiciona o novo cliente se ele ainda não está conectado
-            if (not connected)
-            {
-                this->clients.push_back(new_client);
+                // Inicia as aresta
+                Edge& e = this->edges[i][j];
+                e.vertex_pair = { i, j };   // Par de vértices
+                e.weight = 0;               // Peso 0 (default)
+                e.connected = false;        // Desconectados (default)
             }
         }
+    }
 
-        // Delay
-        delay(dt);
-
-        // Processa pedidos de clientes conectados
-        for (auto& client : this->clients)
+    /*
+    *   Debug
+    */
+    void debug()
+    {
+        std::cout << std::endl;
+        std::cout << "   ";
+        for (Vertex i = 0; i < this->vertexes(); i++)
         {
-            if (client.available())
+            std::cout << " " << i << "   ";
+        }
+        std::cout << std::endl;
+        for (Vertex i = 0; i < this->vertexes(); i++)
+        {
+            std::cout << i << " ";
+            for (Vertex j = 0; j < this->vertexes(); j++)
             {
-                // Lê o pedido
-                String message = client.readStringUntil('\n');
-                JsonObject const& request = this->json_buffer.parseObject(message);
-
-                // Verifica se é uma solicitação
-                String addressee = request.get<String>("addressee");
-                if (addressee == "request_state")
+                std::cout << "[";
+                auto& w = this->edges[i][j].weight;
+                if (w == infinity)
                 {
-                    JsonObject& response = this->json_buffer.createObject();
-                    for (auto& it : this->systems)
-                    {
-                        JsonObject& state = response.createNestedObject(it.first);
-                        it.second->request_state(state);
-                    }
-                    message = "";
-                    response.printTo(message);
-                    client.println(message);
-                    client.flush();
+                    std::cout << "inf";
                 }
-
-                // Ou se é um comando
                 else
                 {
-                    this->send_message(addressee, [&] (JsonObject& message)
-                    {
-                        for (auto& obj : request)
-                        {
-                            message.set(obj.key, obj.value);
-                        }
-                    });
+                    std::cout.fill(' ');
+                    std::cout << std::setw(3) << std::internal << this->edges[i][j].weight;
                 }
-
-                // Limpa o buffer
-                this->json_buffer.clear();
+                std::cout << "]";
             }
+            std::cout << std::endl;
         }
-
-        // Remove clientes desconectados
-        std::remove_if(this->clients.begin(), this->clients.end(), [&] (WiFiClient& client)
-        {
-            return not client.connected();
-        });
-
-        // Delay
-        delay(dt);
+        std::cout << std::endl;
     }
 
     /*
-    *   Envia uma mensagem a todos os sistemas
+    *   Retorna o número de vértices no grafo
     */
-    void send_message(String const& addressee, std::function<void(JsonObject&)> add_content)
+    unsigned long vertexes() const
     {
-        // Cria um objeto para mensagem
-        JsonObject& message = this->json_buffer.createObject();
+        return num_of_vertexes;
+    }
 
-        // Adiciona conteúdo à mensagem
-        add_content(message);
+    /*
+    *   Garante que está dentro do range e avisa caso contrário
+    */
+    #define assert_is_in_range(n) \
+        assert((n < 0 or n > this->vertexes(), "número de vértices excedido!"))
 
-        // Despacha a mensagem para todos os sistemas
-        if (addressee == "all")
+    /*
+    *   Adiciona uma nova aresta (u,v) com peso w ao grafo
+    */
+    void add_edge(Vertex u, Vertex v, Edge::Weight w)
+    {
+        // Garante que u e v estão dentro do range
+        assert_is_in_range(u);
+        assert_is_in_range(v);
+        this->edges[u][v].weight = w;
+        this->edges[u][v].connected = true;
+    }
+
+    /*
+    *   Remove uma aresta (u,v) do grafo
+    */
+    void remove_edge(Vertex u, Vertex v)
+    {
+        // Garante que u e v estão dentro do range
+        assert_is_in_range(u);
+        assert_is_in_range(v);
+        this->edges[u][v].weight = infinity;
+        this->edges[u][v].connected = false;
+    }
+
+    /*
+    *   Relaxamento
+    */
+    void relax(Vertex& u, Vertex& v, std::vector<Distance>& dist, std::vector<Vertex>& parent)
+    {
+        Edge& e = this->edges[u][v];
+        if (e.connected)
         {
-            for (auto& it : this->systems)
+            if (dist[v] > dist[u] + e.weight)
             {
-                it.second->notify(this, message);
+                dist[v] = dist[u] + e.weight;
+                parent[v] = u;
+            }
+        }
+    }
+
+    /*
+    *   Algoritmo de Dijkstra para o caminho mais curto
+    */
+    void dijkstra(Vertex s, std::vector<Distance>& dist, std::vector<Vertex>& parent)
+    {
+        // Garante o tamanho do output
+        dist.resize(this->vertexes());
+        parent.resize(this->vertexes());
+
+        // Inicialização
+        std::vector<bool> visited_vertex(this->vertexes());
+        for (Vertex u = 0; u < this->vertexes(); u++)
+        {
+            dist[u] = infinity;
+            parent[u] = none;
+            visited_vertex[u] = false;
+        }
+        dist[s] = 0;
+
+        // Busca pelo caminho mais curto
+        for (Vertex i = 0; i < this->vertexes(); i++)
+        {
+            // Busca pelo vértice de menor distância
+            Vertex u = 0;
+            Distance min = infinity;
+            for (Vertex j = 0; j < this->vertexes(); j++)
+            {
+                if (dist[j] < min and not visited_vertex[j])
+                {
+                    min = dist[j];
+                    u = j;
+                }
+            }
+            visited_vertex[u] = true;
+
+            // Relaxamento
+            for (Vertex v = 0; v < this->vertexes(); v++)
+            {
+                this->relax(u, v, dist, parent);
             }
         }
 
-        // Despacha somente para um destinatário
-        else
+        #undef dist
+        #undef parent
+    }
+
+    /*
+    *   Algoritmo de Bellman-Ford para o caminho mais curto
+    */
+    bool bellman_ford(Vertex s, std::vector<Distance>& dist, std::vector<Vertex>& parent)
+    {
+        // Inicialização
+        dist.resize(this->vertexes());
+        parent.resize(this->vertexes());
+        for (Vertex u = 0; u < this->vertexes(); u++)
         {
-            auto it = this->systems.find(addressee);
-            if (it != this->systems.end())
+            dist[u] = infinity;
+            parent[u] = none;
+        }
+        dist[s] = 0;
+
+        // Relaxamento
+        for (Vertex i = 0; i < this->vertexes(); i++)
+            for (Vertex u = 0; u < this->vertexes(); u++)
+                for (Vertex v = 0; v < this->vertexes(); v++)
+                    this->relax(u, v, dist, parent);
+
+        // Verificação
+        for (Vertex u = 0; u < this->vertexes(); u++)
+            for (Vertex v = 0; v < this->vertexes(); v++)
+                if (dist[v] > dist[u] + this->edges[u][v].weight)
+                    return false;
+        return true;
+    }
+
+    /*
+    *   Algoritmo de Floyd-Warshall para o caminho mais curto
+    */
+    void floyd_warshall(std::vector< std::vector<Distance> >& dist)
+    {
+        // Garante o tamanho do output e inicia a matriz
+        dist.resize(this->vertexes());
+        for (Vertex i = 0; i < this->vertexes(); i++)
+        {
+            dist[i].resize(this->vertexes());
+            for (Vertex j = 0; j < this->vertexes(); j++)
             {
-                this->systems[addressee]->notify(this, message);
+                dist[i][j] = infinity;
             }
         }
 
-        // Limpa o buffer
-        this->json_buffer.clear();
+        // Copia os pesos
+        for (Vertex i = 0; i < this->vertexes(); i++)
+            for (Vertex j = 0; j < this->vertexes(); j++)
+                if (this->edges[i][j].connected)
+                    dist[i][j] = this->edges[i][j].weight;
+
+        // Busca pelos caminhos mais curtos
+        for (Vertex k = 0; k < this->vertexes(); k++)
+            for (Vertex i = 0; i < this->vertexes(); i++)
+                for (Vertex j = 0; j < this->vertexes(); j++)
+                    if (dist[i][j] > dist[i][k] + dist[k][j])
+                        dist[i][j] = dist[i][k] + dist[k][j];
+
+        // Marca como infinito a diagonal principal
+        for (Vertex i = 0; i < this->vertexes(); i++)
+            dist[i][i] = infinity;
+    }
+
+    // Limpa os #defines
+    #undef assert_is_in_range
+};
+
+// #####################################################################
+// # Grafo Dinâmico, usado quando o número de vértices é desconhecido
+// # e há a necessidade de se adicionar e/ou remover vértices
+// # em tempo de execução do programa.
+// # Implementado usando uma lista de adjacência.
+// #####################################################################
+
+class DynamicGraph:
+    public IGraph
+{
+
+private: // Atributos privados
+
+    // Mapa de listas encadeadas para armazenar os vértices
+    using AdjacencyList = std::map< Vertex, std::map< Vertex, Edge > >;
+    AdjacencyList edges;
+
+public: // Interface pública
+
+    /*
+    *   Construtor
+    */
+    DynamicGraph():
+        edges()
+    {}
+
+    /*
+    *   Debug
+    */
+    void debug()
+    {
+        for (Vertex u = 0; u < this->vertexes(); u++)
+        {
+            std::cout << u;
+            for (auto const& edge : this->edges[u])
+            {
+                std::cout << " --> " << edge.second.vertex_pair.second;
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
+
+    /*
+    *   Retorna o número de vértices no grafo
+    */
+    unsigned long vertexes() const
+    {
+        return this->edges.size();
+    }
+
+    /*
+    *   Adiciona um novo vértice u ao grafo
+    */
+    bool add_vertex(Vertex u)
+    {
+        auto it = this->edges.find(u);
+        if (it == this->edges.end())
+        {
+            this->edges[u] = std::map< Vertex, Edge >();
+            return true;
+        }
+        else return false;
+    }
+
+    /*
+    *   Remove um vértice u do grafo
+    */
+    bool remove_vertex(Vertex u)
+    {
+        try
+        {
+            this->edges.erase(u);
+            return true;
+        }
+        catch (std::out_of_range const&)
+        {
+            return false;
+        }
+    }
+
+    /*
+    *   Adiciona uma nova aresta (u,v) com peso w ao grafo
+    */
+    void add_edge(Vertex u, Vertex v, Edge::Weight w)
+    {
+        try
+        {
+            this->edges[u][v] = Edge({ u, v }, w, true);
+        }
+        catch (std::out_of_range const&)
+        {
+            return;
+        }
+    }
+
+    /*
+    *   Remove uma aresta (u,v) do grafo
+    */
+    void remove_edge(Vertex u, Vertex v)
+    {
+        try
+        {
+            this->edges[u].erase(v);
+        }
+        catch (std::out_of_range const&)
+        {
+            return;
+        }
+    }
+
+    /*
+    *   Relaxamento
+    */
+    void relax(Vertex& u, Vertex& v, std::vector<Distance>& dist, std::vector<Vertex>& parent)
+    {
+        Edge& e = this->edges[u][v];
+        if (e.connected)
+        {
+            if (dist[v] > dist[u] + e.weight)
+            {
+                dist[v] = dist[u] + e.weight;
+                parent[v] = u;
+            }
+        }
+    }
+
+    /*
+    *   Algoritmo de Dijkstra para o caminho mais curto
+    */
+    void dijkstra(Vertex s, std::vector<Distance>& dist, std::vector<Vertex>& parent)
+    {
+        // Garante o tamanho do output
+        dist.resize(this->vertexes());
+        parent.resize(this->vertexes());
+
+        // Inicialização
+        std::vector<bool> visited_vertex(this->vertexes());
+        for (Vertex u = 0; u < this->vertexes(); u++)
+        {
+            dist[u] = infinity;
+            parent[u] = none;
+            visited_vertex[u] = false;
+        }
+        dist[s] = 0;
+
+        // Busca pelo caminho mais curto
+        for (Vertex i = 0; i < this->vertexes(); i++)
+        {
+            // Busca pelo vértice de menor distância
+            Vertex u = 0;
+            Distance min = infinity;
+            for (Vertex j = 0; j < this->vertexes(); j++)
+            {
+                if (dist[j] < min and not visited_vertex[j])
+                {
+                    min = dist[j];
+                    u = j;
+                }
+            }
+            visited_vertex[u] = true;
+
+            // Relaxamento
+            for (Vertex v = 0; v < this->vertexes(); v++)
+            {
+                this->relax(u, v, dist, parent);
+            }
+        }
+
+        #undef dist
+        #undef parent
+    }
+
+    /*
+    *   Algoritmo de Bellman-Ford para o caminho mais curto
+    */
+    bool bellman_ford(Vertex s, std::vector<Distance>& dist, std::vector<Vertex>& parent)
+    {
+        // Inicialização
+        dist.resize(this->vertexes());
+        parent.resize(this->vertexes());
+        for (Vertex u = 0; u < this->vertexes(); u++)
+        {
+            dist[u] = infinity;
+            parent[u] = none;
+        }
+        dist[s] = 0;
+
+        // Relaxamento
+        for (Vertex i = 0; i < this->vertexes(); i++)
+            for (Vertex u = 0; u < this->vertexes(); u++)
+                for (Vertex v = 0; v < this->vertexes(); v++)
+                    this->relax(u, v, dist, parent);
+
+        // Verificação
+        for (Vertex u = 0; u < this->vertexes(); u++)
+            for (Vertex v = 0; v < this->vertexes(); v++)
+                if (dist[v] > dist[u] + this->edges[u][v].weight)
+                    return false;
+        return true;
+    }
+
+    /*
+    *   Algoritmo de Floyd-Warshall para o caminho mais curto
+    */
+    void floyd_warshall(std::vector< std::vector<Distance> >& dist)
+    {
+        // Garante o tamanho do output e inicia a matriz
+        dist.resize(this->vertexes());
+        for (Vertex i = 0; i < this->vertexes(); i++)
+        {
+            dist[i].resize(this->vertexes());
+            for (Vertex j = 0; j < this->vertexes(); j++)
+            {
+                dist[i][j] = infinity;
+            }
+        }
+
+        // Copia os pesos
+        for (Vertex i = 0; i < this->vertexes(); i++)
+            for (Vertex j = 0; j < this->vertexes(); j++)
+                if (this->edges[i][j].connected)
+                    dist[i][j] = this->edges[i][j].weight;
+
+        // Busca pelos caminhos mais curtos
+        for (Vertex k = 0; k < this->vertexes(); k++)
+            for (Vertex i = 0; i < this->vertexes(); i++)
+                for (Vertex j = 0; j < this->vertexes(); j++)
+                    if (dist[i][j] > dist[i][k] + dist[k][j])
+                        dist[i][j] = dist[i][k] + dist[k][j];
+
+        // Marca como infinito a diagonal principal
+        for (Vertex i = 0; i < this->vertexes(); i++)
+            dist[i][i] = infinity;
     }
 };
 
-// #################################################################################################
-// # Sistema Controlador de Output
-// #################################################################################################
+// #####################################################################
+// # Driver
+// #####################################################################
 
-class OutputControlSystem:
-    public SystemInterface
+int main()
 {
-private:
+    // Lista de arestas que define o grafo
+    Edge::List edge_list = {
 
-    // Estrutura pino
-    struct Pin
-    {
-        int number;
-        bool state;
+           // Arestas com origem em 0
+           { { 0, 1 }, 5 },
+           { { 0, 2 }, 4 },
+           { { 0, 3 }, 2 },
 
-        Pin(int p, bool s):
-            number(p),
-            state(s)
-        {}
+           // Arestas com origem em 1
+           { { 1, 0 }, 5 },
+           { { 1, 2 }, 1 },
+           { { 1, 5 }, 6 },
+
+           // Arestas com origem em 2
+           { { 2, 0 }, 4 },
+           { { 2, 1 }, 1 },
+           { { 2, 4 }, 6 },
+           { { 2, 5 }, 9 },
+           { { 2, 6 }, 5 },
+
+           // Arestas com origem em 3
+           { { 3, 0 }, 2 },
+           { { 3, 7 }, 4 },
+
+           // Arestas com origem em 4
+           { { 4, 2 }, 6 },
+           { { 4, 6 }, 4 },
+           { { 4, 7 }, 4 },
+
+           // Arestas com origem em 5
+           { { 5, 1 }, 6 },
+           { { 5, 2 }, 9 },
+           { { 5, 6 }, 6 },
+
+           // Arestas com origem em 6
+           { { 6, 2 }, 5 },
+           { { 6, 4 }, 4 },
+           { { 6, 5 }, 6 },
+           { { 6, 7 }, 3 },
+
+           // Arestas com origem em 7
+           { { 7, 3 }, 4 },
+           { { 7, 4 }, 4 },
+           { { 7, 6 }, 3 },
     };
 
-    // Vetor de pinos
-    std::vector<Pin> pins;
+    constexpr int num_of_vertexes = 8;
 
-public: // Interface pública
+    std::cout << "###########################################################" << std::endl;
+    std::cout << "# GRAFO COM MATRIZ DE ADJACÊNCIA" << std::endl;
+    std::cout << "###########################################################\n" << std::endl;
 
-    /*
-    *   Construtor da classe
-    */
-    OutputControlSystem(std::vector<int> pins):
-        pins()
+    // Cria um gráfico simples com 'num_of_vertexes' vértices e adiciona as arestas
+    StaticGraph<num_of_vertexes> static_graph;
+    for (auto& edge : edge_list)
     {
-        for (auto& pin : pins)
-        {
-            pinMode(pin, OUTPUT);
-            this->pins.push_back(
-                Pin(pin, LOW)
-            );
-        }
+        auto& vertex = edge.first;
+        auto& weight = edge.second;
+        static_graph.add_edge(vertex.first, vertex.second, weight);
     }
 
-    /*
-    *   Recebe notificações do servidor
-    */
-    void notify(SystemManager * sys, JsonObject const& message)
-    {
-        // Veririca se a mensagem contém os parâmetros
-        // que interessa ao módulo
-        if (message.containsKey("pin") and message.containsKey("state"))
-        {
-            // Recebe a mensagem
-            auto pin_number = message.get<int>("pin");
-            auto state = message.get<bool>("state");
+    // Imprime o grafo para debug
+    static_graph.debug();
 
-            // Atualiza o estado da lâmpada
-            for (auto& pin : this->pins)
+    std::cout << "###########################################################" << std::endl;
+    std::cout << "# Dijkstra" << std::endl;
+    std::cout << "###########################################################\n" << std::endl;
+
+    // Algoritmo de Dijkstra
+    std::vector<Distance> dist;
+    std::vector<Vertex> path;
+    static_graph.dijkstra(0, dist, path);
+    for (Vertex i = 0; i < num_of_vertexes; i++)
+    {
+        std::cout << " Vértice : " << i;
+        std::cout << " Distância: " << dist[i];
+        std::cout << " Caminho: " << i;
+        Vertex parent = path[i];
+        while (parent != none)
+        {
+            std::cout << " <--- " << parent;
+            parent = path[parent];
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+
+    std::cout << "###########################################################" << std::endl;
+    std::cout << "# Bellman-Ford" << std::endl;
+    std::cout << "###########################################################\n" << std::endl;
+
+    dist.clear();
+    path.clear();
+    static_graph.bellman_ford(0, dist, path);
+    for (Vertex i = 0; i < num_of_vertexes; i++)
+    {
+        std::cout << " Vértice : " << i;
+        std::cout << " Distância: " << dist[i];
+        std::cout << " Caminho: " << i;
+        Vertex parent = path[i];
+        while (parent != none)
+        {
+            std::cout << " <--- " << parent;
+            parent = path[parent];
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+
+    std::cout << "###########################################################" << std::endl;
+    std::cout << "# Floyd-Warshall" << std::endl;
+    std::cout << "###########################################################\n" << std::endl;
+
+    std::vector< std::vector<Distance> > distance_matrix;
+    static_graph.floyd_warshall(distance_matrix);
+    for (Vertex i = 0; i < num_of_vertexes; i++)
+    {
+        for (Vertex j = 0; j < num_of_vertexes; j++)
+        {
+            std::cout << "[";
+            if (distance_matrix[i][j] == infinity)
             {
-                // Debug
-                Serial.print("\n\nPino => ");
-                Serial.print(pin.number);
-                Serial.print(" Estado => ");
-                Serial.println(pin.state);
-
-                if (pin.number == pin_number)
-                {
-                    pin.state = state;
-                    break;
-                }
+                std::cout << "inf";
             }
-        }
-    }
-
-    /*
-    *   Atualiza o estado do controlador
-    */
-    void update(SystemManager *)
-    {
-        for (auto pin : this->pins)
-        {
-            digitalWrite(pin.number, pin.state);
-        }
-    }
-
-    /*
-    *   Retorna o estado do sistema
-    */
-    void request_state(JsonObject& state)
-    {
-        for (auto& pin : this->pins)
-        {
-            state.set(
-                String(pin.number),
-                String(pin.state)
-            );
-        }
-    }
-};
-
-// #################################################################################################
-// # Sistema Controlador do Sensor de Presença
-// #################################################################################################
-
-class OccupancySensorControlSystem:
-    public SystemInterface
-{
-private: // Atributos privados
-
-    // Domínio do problema
-    using Time = unsigned long;
-
-    // Vetor com os pinos em que este sensor opera
-    std::vector<int> output_pins;
-
-    // Pino em que o sensor está ligado
-    int pir;
-
-    // Ponto de ativação no domínio do tempo
-    Time activation_point;
-
-    // Intervalo de tempo em ms que o sensor fica ativo
-    Time activation_interval;
-
-public: // Interface publica
-
-    /*
-    *   Construtor
-    */
-    OccupancySensorControlSystem(int p, Time dt, std::vector<int> o):
-        pir(p),
-        output_pins(o),
-        activation_point(0),
-        activation_interval(dt)
-    {
-        pinMode(this->pir, INPUT);
-    }
-
-    bool read_sensor(int led_pin)
-    {
-        return digitalRead(led_pin);
-    }
-
-    /*
-    *   Ativa o pino correspondente até que dt tenha passado
-    */
-    void update(SystemManager * sys)
-    {
-        #define ON HIGH
-        #define OFF LOW
-
-        // Recebe o estado atual do sensor
-        bool sensor_state = this->read_sensor(this->pir);
-
-        // Debug
-        Serial.print("\n\nEstado do sensor de Presença => ");
-        Serial.println(sensor_state);
-
-        // Se o sensor de presença estiver ativado
-        if (sensor_state == ON)
-        {
-            // Envia uma mensagem aos pinos associados
-            for (auto& pin : this->output_pins)
+            else
             {
-                sys->send_message("output_control", [&] (JsonObject& message)
-                {
-                    message.set("pin", pin);
-                    message.set("state", LOW);
-                });
+                std::cout.fill(' ');
+                std::cout << std::setw(3) << std::internal << distance_matrix[i][j];
             }
-
-            // Atualiza o tempo em que o sensor foi ativado
-            this->activation_point = millis();
+            std::cout << "]";
         }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
 
-        // Se não
-        else if (sensor_state == OFF)
+    std::cout << "###########################################################" << std::endl;
+    std::cout << "# GRAFO COM LISTA DE ADJACÊNCIA" << std::endl;
+    std::cout << "###########################################################\n" << std::endl;
+
+    // Grafo dinâmico
+    DynamicGraph dynamic_graph;
+
+    // Adiciona vértices
+    for (uint32_t i = 0; i < num_of_vertexes; i++)
+    {
+        dynamic_graph.add_vertex(i);
+    }
+
+    // Adiciona arestas
+    for (auto& edge : edge_list)
+    {
+        auto& vertex = edge.first;
+        auto& weight = edge.second;
+        dynamic_graph.add_edge(vertex.first, vertex.second, weight);
+    }
+
+    // debug
+    dynamic_graph.debug();
+
+    std::cout << "###########################################################" << std::endl;
+    std::cout << "# Dijkstra" << std::endl;
+    std::cout << "###########################################################\n" << std::endl;
+
+    dist.clear();
+    path.clear();
+    dynamic_graph.dijkstra(0, dist, path);
+    for (Vertex i = 0; i < num_of_vertexes; i++)
+    {
+        std::cout << " Vértice : " << i;
+        std::cout << " Distância: " << dist[i];
+        std::cout << " Caminho: " << i;
+        Vertex parent = path[i];
+        while (parent != none)
         {
-            // Verifica o intervalo desde o último ponto de ativação é maior do que dt
-            if (millis() - this->activation_point > this->activation_interval)
-            {
-                // Notifica os pinos para apagarem
-                for (auto& pin : this->output_pins)
-                {
-                    sys->send_message("output_control", [&] (JsonObject& message)
-                    {
-                        message.set("pin", pin);
-                        message.set("state", HIGH);
-                    });
-                }
-            }
+            std::cout << " <--- " << parent;
+            parent = path[parent];
         }
-
-        #undef ON
-        #undef OFF
+        std::cout << std::endl;
     }
-};
+    std::cout << std::endl;
 
-// #################################################################################################
-// # Sistema Controlador do Sensor Ultrassônico
-// #################################################################################################
+    std::cout << "###########################################################" << std::endl;
+    std::cout << "# Bellman-Ford" << std::endl;
+    std::cout << "###########################################################\n" << std::endl;
 
-class UltrasonicSensorControlSystem:
-    public SystemInterface
-{
-private: // Atributos privados
-
-    // Par de pinos para o sensor ultrassônico
-    std::pair<int, int> sensor_pin;
-
-    // Pino de output
-    int output_pin;
-
-    // Valor mínimo de ativação (threshold)
-    int threshold;
-
-    // Tempo do último pulso
-    unsigned long last_pulse;
-
-    // Sensor ultrassônico
-    Ultrasonic ultrasonic;
-
-public: // Interface pública
-
-    /*
-    *   Construtor
-    */
-    UltrasonicSensorControlSystem(std::pair<int, int> s, int o, int t):
-        sensor_pin(s),
-        output_pin(o),
-        threshold(t),
-        last_pulse(0),
-        ultrasonic(s.first, s.second)
+    dist.clear();
+    path.clear();
+    dynamic_graph.bellman_ford(0, dist, path);
+    for (Vertex i = 0; i < num_of_vertexes; i++)
     {
-    }
-
-    /*
-    *   Lê o sensor de presença
-    */
-    double read_sensor()
-    {
-        // Lê o sensor
-        long microsec = ultrasonic.timing();
-        double value = ultrasonic.convert(microsec, Ultrasonic::CM);
-
-        // Debug
-        Serial.print("Distância => ");
-        Serial.print(value);
-        Serial.println("m");
-
-        // Retorna o valor
-        return value;
-    }
-
-    /*
-    *   Manda uma frequência no pino de saída de o valor
-    *   do sensor for menor do que o valor mínimo (threshold)
-    */
-    void update(SystemManager * sys)
-    {
-        #define ON false
-        #define OFF true
-
-        // Recebe o valor do pino do sensor ultrasônico
-        double value = this->read_sensor();
-
-        // Se distância é maior que a distância mínima (threshold), liga o bip
-        if (value <= this->threshold)
+        std::cout << " Vértice : " << i;
+        std::cout << " Distância: " << dist[i];
+        std::cout << " Caminho: " << i;
+        Vertex parent = path[i];
+        while (parent != none)
         {
-            // Quanto mais próximo de zero, a partir de threshold,
-            // maior será a frequência do bip
-            unsigned long interval = 1000 * (value / this->threshold);
-            if (millis() - this->last_pulse > interval)
-            {
-                sys->send_message("output_control", [&] (JsonObject& message) -> void
-                {
-                    message.set("pin", this->output_pin);
-                    message.set(
-                        "state", !digitalRead(this->output_pin)
-                    );
-                });
-                this->last_pulse = millis();
-            }
+            std::cout << " <--- " << parent;
+            parent = path[parent];
         }
-
-        // Se não, desliga o bip
-        else digitalWrite(
-            this->output_pin, LOW
-        );
-
-        #undef ON
-        #undef OFF
+        std::cout << std::endl;
     }
-};
+    std::cout << std::endl;
 
-// #################################################################################################
-// # Sistema Controlador de Telemetria
-// #################################################################################################
+    std::cout << "###########################################################" << std::endl;
+    std::cout << "# Floyd-Warshall" << std::endl;
+    std::cout << "###########################################################\n" << std::endl;
 
-class TelemetryControlSystem:
-    public SystemInterface
-{
-private: // Atributos privados
-
-    // Sensor de humidade e temperatura
-    DHT dht;
-
-    // Valores dos sensores
-    using SensorValue = double;
-    SensorValue humidity;
-    SensorValue temperature;
-    SensorValue luminosity;
-
-public: // Interface pública
-
-    TelemetryControlSystem(int dht_pin):
-        dht(dht_pin, DHT11),
-        humidity(0),
-        temperature(0),
-        luminosity(0)
+    distance_matrix.clear();
+    dynamic_graph.floyd_warshall(distance_matrix);
+    for (Vertex i = 0; i < num_of_vertexes; i++)
     {
-        this->dht.begin();
+        for (Vertex j = 0; j < num_of_vertexes; j++)
+        {
+            std::cout << "[";
+            if (distance_matrix[i][j] == infinity)
+            {
+                std::cout << "inf";
+            }
+            else
+            {
+                std::cout.fill(' ');
+                std::cout << std::setw(3) << std::internal << distance_matrix[i][j];
+            }
+            std::cout << "]";
+        }
+        std::cout << std::endl;
     }
+    std::cout << std::endl;
 
-    /*
-    *   Atualiza os valores dos sensores
-    */
-    void update(SystemManager*)
-    {
-        // Humidade, temperatura e luminosidade
-        this->humidity = this->dht.readHumidity();
-        this->temperature = this->dht.readTemperature();
-        this->luminosity = analogRead(A0);
-
-        // Debug
-        Serial.print("\n\nHumidade => ");
-        Serial.println(this->humidity);
-
-        Serial.print("Temperatura => ");
-        Serial.println(this->temperature);
-
-        Serial.print("Luminosidade => ");
-        Serial.println(this->luminosity);
-    }
-
-    /*
-    *    Retorna os valores dos sensores !!
-    */
-    void request_state(JsonObject& state)
-    {
-        /// Envia os valores
-        state.set("humidity", std::isnan(this->humidity) ? 0 : this->humidity);
-        state.set("temperature", std::isnan(this->temperature) ? 26 : this->temperature);
-        state.set("luminosity", this->luminosity);
-        state.set("current", random(0, 15));
-    }
-};
-
-// #################################################################################################
-// # Modus Operandi
-// #################################################################################################
-
-// Gerenciador de sistemas
-SystemManager system_manager;
-
-void setup()
-{
-    // Serial para debug
-    Serial.begin(9600);
-    delay(500);
-
-    // Parâmetros da rede WiFi
-
-    /*
-    const char * ssid = "TP-LINK_FB88";
-    const char * password = "Da5ch35#1#2";
-    */
-
-    const char * ssid = "INTERNET";
-    const char * password = "";
-
-    const char * host = "Arduino_1";
-
-    // Adiciona sistemas ao gerenciador e inicia os sistemas
-    system_manager
-
-        // Inicia o sistema, paramêtros:
-        //      const char * ssid =>
-        //          Nome da rede WiFi
-        //
-        //      const char * password =>
-        //          Senha da rede WiFi
-        //
-        //      const char * host =>
-        //          Nome do Dispositivo na Rede
-
-        .init(ssid, password, host)
-
-        // Sistema controlador de output, paramêtros:
-        //      vector<int> v =>
-        //          Vetor de inteiros conténdo os pinos que
-        //          serão controlados por este sistema
-
-        .add_system(
-            "output_control",
-            new OutputControlSystem(
-                { D5, D7, D2 }
-            )
-        )
-
-        // Sistema do sensor de presença, paramêtros:
-        //      int n =>
-        //          Inteiro contendo o número do pino onde o sensor está ligado
-        //
-        //      int t =>
-        //          Intervalo de tempo, em ms, que o pino ficará ativo após o disparo do sensor
-        //
-        //      vector<int> v =>
-        //          Vetor de inteiros contendo os pinos
-        //          que responderão à ativação deste sensor
-
-        .add_system(
-            "pir_control",
-            new OccupancySensorControlSystem(
-                D6, 5 * 1000, { D7 }
-            )
-        )
-
-
-        // Sistema do sensor ultrassônico, paramêtros:
-        //      pair<int, int> p =>
-        //          Par de inteiros conténdo os pinos onde
-        //          o sensor de ultra estará ligado
-        //
-        //      int n =>
-        //          Pino que emitirá um pulso com uma frequência
-        //          variável de acordo com o valor de 'threshold'
-        //
-        //      int t =>
-        //          Valor mínimo para que módulo comece a disparar
-        //          pulsos, a frequência de emissão é dada por:
-        //          f = 1000 * (v/t), onde v é valor lido
-        //          do sensor, o sensor só irá disparar um pulso
-        //          quando v <= t
-
-
-        .add_system(
-            "distance_control",
-            new UltrasonicSensorControlSystem(
-                { D3, D4 }, D5, 10
-            )
-        )
-
-        // Sistema de controle de telemetria, paramêtros:
-        //      int n =>
-        //          Pino do sensor dht
-
-        .add_system(
-            "telemetry_control",
-            new TelemetryControlSystem(D8)
-        )
-    ;
-}
-
-// Atualiza o estado do dispositivo
-void loop()
-{
-    // Atualiza os sistemas
-    const int delay = 50;
-    system_manager.update(delay);
+    return 0;
 }

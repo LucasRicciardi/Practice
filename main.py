@@ -2,6 +2,7 @@
 
 import math
 import time
+import random
 
 #######################################################################
 # Função que imprime o grafo com valores das distâncias  os caminhos
@@ -57,6 +58,7 @@ class Graph():
     def __init__(self, representation, weighted):
         self.representation = representation()
         self.weighted = weighted
+        self.edges = []
         self.vertices = []
 
     def debug(self):
@@ -74,10 +76,6 @@ class Graph():
 
     def add_edges(self, edge_list):
         self.representation.add_edges(self, edge_list)
-
-    def edges(self):
-        for edge in self.representation.edges_set(self):
-            yield edge
 
     def neighbours(self, u):
         return self.representation.neighbours(self, u)
@@ -111,11 +109,11 @@ class Graph():
             u.parent = None
         s.distance = 0
         for i in range(0, len(self.vertices)):
-            for (u, v) in self.edges():
+            for (u, v) in self.edges:
                 if v.distance > u.distance + self.weight(u, v):
                     v.distance = u.distance + self.weight(u, v)
                     v.parent = u
-        for (u, v) in self.edges():
+        for (u, v) in self.edges:
             if v.distance > u.distance + self.weight(u, v):
                 return False
         return True
@@ -125,7 +123,7 @@ class Graph():
             [ math.inf for _ in range(0, len(self.vertices)) ]
                 for _ in range(0, len(self.vertices))
         ]
-        for (u, v) in self.edges():
+        for (u, v) in self.edges:
             dist[u.value][v.value] = self.weight(u, v)
         for k in range(0, len(self.vertices)):
             for i in range(0, len(self.vertices)):
@@ -154,16 +152,13 @@ class AdjacencyMatrix():
                 self.edges[i].append(0)
         for (i, j), w in edge_list:
             self.edges[i][j] = w if G.weighted else 1
-
-    def edges_set(self, G):
-        r = []
+        G.edges = []
         for i in range(0, len(self.edges)):
             for j in range(0, len(self.edges)):
                 if self.edges[i][j] > 0:
-                    r.append(
+                    G.edges.append(
                         [ G.vertices[i], G.vertices[j] ]
                     )
-        return r
 
     def neighbours(self, G, u):
         r = []
@@ -219,15 +214,14 @@ class AdjacencyList():
                 self.edges.append(
                     AdjacencyList.Node(G.vertices[j], w)
                 )
-
-    def edges_set(self, G):
-        r = []
+        G.edges = []
         for n, edge in enumerate(self.edges):
             node = edge
             while node != None:
-                r.append( [ G.vertices[n], node.node ])
+                G.edges.append(
+                    [ G.vertices[n], node.node ]
+                )
                 node = node.next
-        return r
 
     def neighbours(self, G, u):
         r = []
@@ -277,51 +271,15 @@ def main():
         print('###############################################################\n')
 
         # Adiciona nós e arestas com peso ao grafo
-        G.add_vertex([ i for i in range(8) ])
-        G.add_edges([
-
-            # Arestas com origem em 0
-            [ (0, 1), 5 ],
-            [ (0, 2), 4 ],
-            [ (0, 3), 2 ],
-
-            # Arestas com origem em 1
-            [ (1, 0), 5 ],
-            [ (1, 2), 1 ],
-            [ (1, 5), 6 ],
-
-            # Arestas com origem em 2
-            [ (2, 0), 4 ],
-            [ (2, 1), 1 ],
-            [ (2, 4), 6 ],
-            [ (2, 5), 9 ],
-            [ (2, 6), 5 ],
-
-            # Arestas com origem em 3
-            [ (3, 0), 2 ],
-            [ (3, 7), 4 ],
-
-            # Arestas com origem em 4
-            [ (4, 2), 6 ],
-            [ (4, 6), 4 ],
-            [ (4, 7), 4 ],
-
-            # Arestas com origem em 5
-            [ (5, 1), 6 ],
-            [ (5, 2), 9 ],
-            [ (5, 6), 6 ],
-
-            # Arestas com origem em 6
-            [ (6, 2), 5 ],
-            [ (6, 4), 4 ],
-            [ (6, 5), 6 ],
-            [ (6, 7), 3 ],
-
-            # Arestas com origem em 7
-            [ (7, 3), 4 ],
-            [ (7, 4), 4 ],
-            [ (7, 6), 3 ],
-        ])
+        v = 100
+        e = v**2
+        G.add_vertex([ i for i in range(0, v) ])
+        G.add_edges(
+            [
+                [ (random.randint(0, v-1), random.randint(0, v-1)), random.randint(0, e) ]
+                    for _ in range(0, e)
+            ]
+        )
 
         # Debug
         print('Debug da representação deste grafo')
@@ -333,7 +291,7 @@ def main():
         print('###############################################################\n')
         for u in G.vertices:
             evalute_time(G.dijkstra, u)
-            show_results(G, u)
+            # show_results(G, u)
 
         # Roda o Algoritmo de Bellman-Ford
         print('###############################################################')
@@ -345,7 +303,7 @@ def main():
                 print('G não contém ciclos negativos')
             else:
                 print('G contém ciclos negativos')
-            show_results(G, u)
+            # show_results(G, u)
 
         # Roda o Algoritmo de Floyd-Warshall
         print('###############################################################')
