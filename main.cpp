@@ -14,10 +14,6 @@
 #include <list>
 
 // #####################################################################
-// # Funções Auxiliares
-// #####################################################################
-
-// #####################################################################
 // # Estrutura Vértice e Estrutura Aresta
 // #####################################################################
 
@@ -57,32 +53,6 @@ constexpr Edge::Weight infinity = 999999;
 
 // Nenhum pai
 constexpr Vertex none = std::numeric_limits<Vertex>::max();
-
-// #####################################################################
-// # Interface de Grafo
-// #####################################################################
-
-class IGraph
-{
-private: // Atributos privados
-
-protected: // Interface para subclasses
-
-    /*
-    *   Construtor
-    */
-    IGraph()
-    {}
-
-    /*
-    *   Destrutor
-    */
-    virtual ~IGraph()
-    {}
-
-public: // Interface pública
-
-};
 
 // #####################################################################
 // # Grafo Estático, usado quando o número de vértices é conhecido
@@ -331,8 +301,7 @@ public: // Interface pública
 // # Implementado usando uma lista de adjacência.
 // #####################################################################
 
-class DynamicGraph:
-    public IGraph
+class DynamicGraph
 {
 
 private: // Atributos privados
