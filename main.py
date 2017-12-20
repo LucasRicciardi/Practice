@@ -1,329 +1,279 @@
 # -*- coding: utf-8 -*-
 
+import pygame
+
 import math
 import time
 import random
 
-#######################################################################
-# Função que imprime o grafo com valores das distâncias  os caminhos
-#######################################################################
+# Tamanho da tela
+SCREEN_SIZE = (640*2, 480*2)
 
-def show_results(G, u):
-    print('\nResultados da busca pelos caminhos mais curtos ...')
-    print('Source (raíz) = {}'.format(u.value))
-    for v in sorted(G.vertices, key=lambda v: v.value):
-        print('Nó: {}, Distância mínima: {}, Caminho: '.format(v.value, v.distance), end='')
-        p = v
-        if p.parent == None:
-            if p.value == u.value:
-                print('Este é o nó raíz', end='')
-            else:
-                print('Não existe caminho !', end='')
-        else:
-            q = []
-            while p != None:
-                q.append(p.value)
-                p = p.parent
-            while len(q) > 0:
-                print(q.pop(), end='')
-                if len(q) > 0:
-                    print(' --> ', end='')
-        print('')
-    print('')
+# Número de leds na fita
+NUM_OF_LEDS = 5
 
-#######################################################################
-# Função calcula o tempo que o algoritmo levou
-#######################################################################
+PERIOD_RANGE = (200, 1000)
 
-def evalute_time(algorithm, *args):
-    begin = time.time()
-    res = algorithm(*args)
-    end = time.time()
-    print('Tempo : {:2f}s \n'.format(end-begin))
-    return res
+# '  #     #  ',
+# '   #   #   ',
+# '  #######  ',
+# ' ## ### ## ',
+# '###########',
+# '# ####### #',
+# '# #     # #',
+# '   ## ##   ',
 
-#######################################################################
-# Grafo
-#######################################################################
+########################################################################################
+# Padrões de desenho, canvas 5x5
+########################################################################################
 
-class Graph():
+SPACE_INVADERS_PATTERN = [
 
-    class Node():
+    '  #     #       #     #       #     #  ',
+    '   #   #         #   #         #   #   ',
+    '  #######       #######       #######  ',
+    ' ## ### ##     ##-###-##     ## ### ## ',
+    '###########   ###########   ###########',
+    '# ####### #   # ####### #   # ####### #',
+    '# #     # #   # #     # #   # #     # #',
+    '   ## ##         ## ##         ## ##   ',
 
-        def __init__(self, value):
-            self.value = value
-            self.distance = 0
-            self.parent = None
+]
 
-    def __init__(self, representation, weighted):
-        self.representation = representation()
-        self.weighted = weighted
-        self.edges = []
-        self.vertices = []
+########################################################################################
+# Canvas
+########################################################################################
 
-    def debug(self):
-        print('Nós: ', end='')
-        for u in self.vertices:
-            print('{} '.format(u.value), end='')
-        print('\n')
-        self.representation.debug()
+class Canvas():
 
-    def add_vertex(self, vertex_list):
-        for vertex in vertex_list:
-            self.vertices.append(
-                Graph.Node(vertex)
+    def __init__(self, radius, r_partitions, w_partitions, pattern):
+        # Raio
+        self.radius = radius
+
+        # Tamanho das partições
+        self.r_partitions = r_partitions
+        self.w_partitions = w_partitions
+
+        # Intervalo de cada partição
+        self.dr = int(self.radius / self.r_partitions)
+        self.dw = int(360 / self.w_partitions)
+
+        # Período e fase
+        self.update_period(10)
+        self.phase = 0
+
+        # Padrão a ser renderizado
+        self.pattern = pattern
+
+        # Limpa a tela
+        self.clean_screen = False
+
+    def update_period(self, new_period):
+        self.period = new_period / 1000 if new_period > 0 else 10 / 1000
+        self.d_phase = math.degrees(-2 * math.pi * (1/self.period))
+        print('Período de Oscilação = {}s'.format(self.period))
+
+    def update(self, dt):
+        elapsed_time = dt * (10**-3) # ms -> s
+
+        # Atualiza a posição do fasor
+        self.phase += self.d_phase * elapsed_time
+
+        # Verifica se é hora de mudar o período
+        if self.phase < -360:
+            self.update_period(
+                random.randrange(
+                    PERIOD_RANGE[0],
+                    PERIOD_RANGE[1]
+                )
+            )
+            self.phase = -(-self.phase % 360)
+            self.clean_screen = True
+
+    def render(self, screen, debug=False):
+        (w, h) = screen.get_size()                  # Dimensões da tela
+        center = (x0, y0) = [ int(w/2), int(h/2) ]  # Centro da tela
+
+        # Limpa a tela
+        if self.clean_screen:
+            self.clean_screen = False
+            screen.fill(
+                pygame.Color('white')
             )
 
-    def add_edges(self, edge_list):
-        self.representation.add_edges(self, edge_list)
+        # Renderiza o círculo do 'mundo'
+        self.draw_canvas(screen, center, debug)
 
-    def neighbours(self, u):
-        return self.representation.neighbours(self, u)
+        # Renderiza o fasor posição
+        if debug:
+            self.draw_fasor(screen, center)
 
-    def weight(self, u, v):
-        return self.representation.weight(u, v)
+        # Renderiza o padrão pré programado
+        self.draw_pattern(screen, center)
 
-    #############################################################################
-    # Algoritmos de Dijkstra, Bellman-Ford e Floyd-Warshall
-    #############################################################################
-
-    def dijkstra(self, s):
-        for u in self.vertices:
-            u.distance = math.inf
-            u.parent =  None
-        s.distance = 0
-        S = []
-        Q = [ u for u in self.vertices ]
-        while len(Q) > 0:
-            u = min(Q, key=lambda v: v.distance)
-            S.append(u)
-            for v in self.neighbours(u):
-                if v.distance > u.distance + self.weight(u, v):
-                    v.distance = u.distance + self.weight(u, v)
-                    v.parent = u
-            Q.remove(u)
-
-    def bellman_ford(self, s):
-        for u in self.vertices:
-            u.distance = math.inf
-            u.parent = None
-        s.distance = 0
-        for i in range(0, len(self.vertices)):
-            for (u, v) in self.edges:
-                if v.distance > u.distance + self.weight(u, v):
-                    v.distance = u.distance + self.weight(u, v)
-                    v.parent = u
-        for (u, v) in self.edges:
-            if v.distance > u.distance + self.weight(u, v):
-                return False
-        return True
-
-    def floyd_warshall(self):
-        dist = [
-            [ math.inf for _ in range(0, len(self.vertices)) ]
-                for _ in range(0, len(self.vertices))
+    def draw_fasor(self, screen, center):
+        (x0, y0) = center
+        phase = math.radians(self.phase)
+        intersection = [
+            int(x0 + self.radius * math.cos(phase)),
+            int(y0 + self.radius * math.sin(phase))
         ]
-        for (u, v) in self.edges:
-            dist[u.value][v.value] = self.weight(u, v)
-        for k in range(0, len(self.vertices)):
-            for i in range(0, len(self.vertices)):
-                for j in range(0, len(self.vertices)):
-                    if dist[i][j] > dist[i][k] + dist[k][j]:
-                        dist[i][j] = dist[i][k] + dist[k][j]
-        for i in range(0, len(self.vertices)):
-            dist[i][i] = math.inf
-        return dist
 
-#######################################################################
-# Grafo usando Matriz de Adjacência
-#######################################################################
+        # Renderiza a reta do vetor de fase
+        pygame.draw.line(
+            screen,
+            pygame.Color('red'),
+            center,
+            intersection,
+            1 # width
+        )
 
-class AdjacencyMatrix():
+    def draw_pattern(self, screen, center):
+        (x0, y0) = center
+        i = -int(self.phase/self.dw)
+        try:
+            for j in range( len(self.pattern) ):
 
-    def __init__(self):
-        self.edges = []
-        self.pt_name = 'Matriz de Adjacência'
+                # Raio é constante
+                radius = 13
 
-    def add_edges(self, G, edge_list):
-        self.edges = []
-        for i in range(0, len(G.vertices)):
-            self.edges.append([])
-            for j in range(0, len(G.vertices)):
-                self.edges[i].append(0)
-        for (i, j), w in edge_list:
-            self.edges[i][j] = w if G.weighted else 1
-        G.edges = []
-        for i in range(0, len(self.edges)):
-            for j in range(0, len(self.edges)):
-                if self.edges[i][j] > 0:
-                    G.edges.append(
-                        [ G.vertices[i], G.vertices[j] ]
+                # position são as coordenadas em função de (i,j)
+                tetha = math.radians(-(i+0.5)*self.dw)
+                # tetha = math.radians(self.phase)
+                position = [
+                    int(x0 + ((j+7) * self.dr) * math.cos(tetha) ),
+                    int(y0 + ((j+7) * self.dr) * math.sin(tetha) )
+                ]
+
+                if self.pattern[j][i] == '#':
+                    pygame.draw.circle(
+                        screen,
+                        pygame.Color('blue'),
+                        position,
+                        radius,
+                        0 # width
                     )
+        except IndexError:
+            pass
 
-    def neighbours(self, G, u):
-        r = []
-        for n, w in enumerate(self.edges[u.value]):
-            if n == u.value:
-                pass
-            else:
-                if w > 0:
-                    r.append(G.vertices[n])
-        return r
+    def draw_canvas(self, screen, center, debug):
+        # Centro do círculo
+        (x0, y0) = center
 
-    def weight(self, u, v):
-        return self.edges[u.value][v.value]
+        # Renderiza o círculo
+        pygame.draw.circle(
+            screen,
+            pygame.Color('black'),
+            center,
+            self.radius,
+            1 # width
+        )
 
-    def debug(self):
-        print('Arestas: ')
-        for i in range(len(self.edges)):
-            for j in range(len(self.edges[i])):
-                print('[{}]'.format(
-                    self.edges[i][j]
-                ), end='')
-            print('')
-        print('')
+        # Renderiza as coordenadas polares
+        if debug:
+            # Renderiza todos os eixos do versor tetha
+            for i in range(self.w_partitions+1):
+                # Ângulo
+                tetha = math.radians(self.dw * i)
 
-#######################################################################
-# Grafo usando Lista de Adjacência
-#######################################################################
+                # intersecção da reta com o círculo do 'mundo'
+                intersection = [
+                    int(x0 + self.radius * math.cos(tetha)),
+                    int(y0 + self.radius * math.sin(tetha))
+                ]
 
-class AdjacencyList():
-
-    class Node():
-
-        def __init__(self, node, weight):
-            self.node = node
-            self.weight = weight
-            self.next = None
-
-    def __init__(self):
-        self.edges = []
-        self.pt_name = 'Lista de Adjacência'
-
-    def add_edges(self, G, edge_list):
-        for (i, j), w in edge_list:
-            w = w if G.weighted else 1
-            try:
-                node = self.edges[i]
-                while node.next != None:
-                    node = node.next
-                node.next = AdjacencyList.Node(
-                    G.vertices[j], w
+                # Renderiza a reta
+                pygame.draw.line(
+                    screen,
+                    pygame.Color('black'),
+                    center,
+                    intersection,
+                    1 # width
                 )
-            except IndexError:
-                self.edges.append(
-                    AdjacencyList.Node(G.vertices[j], w)
+
+            # Renderiza os eixos do versor r
+            for i in range(self.r_partitions):
+                pygame.draw.circle(
+                    screen,
+                    pygame.Color('black'),
+                    center,
+                    self.dr * i,
+                    1 if self.dr * i > 0 else 0 # width
                 )
-        G.edges = []
-        for n, edge in enumerate(self.edges):
-            node = edge
-            while node != None:
-                G.edges.append(
-                    [ G.vertices[n], node.node ]
-                )
-                node = node.next
 
-    def neighbours(self, G, u):
-        r = []
-        node = self.edges[u.value]
-        while node != None:
-            r.append(node.node)
-            node = node.next
-        return r
-
-    def weight(self, u, v):
-        node = self.edges[u.value]
-        while node != None:
-            if node.node == v:
-                return node.weight
-            node = node.next
-
-    def debug(self):
-        print('Arestas: ')
-        for n, edge in enumerate(self.edges):
-            print('({}, {}) --> '.format(n, 0), end='')
-            node = edge
-            while node != None:
-                print('({}, {})'.format(node.node.value, node.weight), end='')
-                if node.next != None:
-                    print(' --> ', end='')
-                node = node.next
-            print('')
-        print('')
-
-###################################################################################
+########################################################################################
 # Driver
-###################################################################################
+########################################################################################
 
 def main():
-    # Referência para a implementação
-    # https://www.cs.usfca.edu/~galles/visualization/Dijkstra.html
-    # - Undirected Graph - Small Graph
+    # Inicia pygame
+    pygame.init()
 
-    for representation in [ AdjacencyMatrix, AdjacencyList ]:
+    # Tela e clock
+    screen  = pygame.display.set_mode(SCREEN_SIZE)
+    screen.fill(
+        pygame.Color('white')
+    )
+    clock = pygame.time.Clock()
 
-        # Cria um grafo com uma representação r
-        G = Graph(representation, weighted=True)
-        print('###############################################################')
-        print('# Grafo usando uma {} '.format(
-            G.representation.pt_name)
-        )
-        print('###############################################################\n')
+    # Canvas circular
+    canvas = Canvas(
+        radius=500,
+        r_partitions=20,
+        w_partitions=50,
+        pattern=SPACE_INVADERS_PATTERN
+    )
 
-        # Adiciona nós e arestas com peso ao grafo
-        v = 100
-        e = v**2
-        G.add_vertex([ i for i in range(0, v) ])
-        G.add_edges(
-            [
-                [ (random.randint(0, v-1), random.randint(0, v-1)), random.randint(0, e) ]
-                    for _ in range(0, e)
-            ]
-        )
+    def millis():
+        return time.time() * 1000
 
-        # Debug
-        print('Debug da representação deste grafo')
-        G.debug()
+    # Variáveis de tempo
+    updates_per_second = 30
+    update_interval = 1000 / updates_per_second
+    last_update = millis()
 
-        # Roda o Algoritmo de Dijkstra em todos os vértices
-        print('###############################################################')
-        print('# Rodando o Algoritmo de Dijkstra em todos os vértices ...')
-        print('###############################################################\n')
-        for u in G.vertices:
-            evalute_time(G.dijkstra, u)
-            # show_results(G, u)
+    # Limpeza de tela
+    clean_interval = len(canvas.pattern) * 1000
+    last_screen_clean = millis()
 
-        # Roda o Algoritmo de Bellman-Ford
-        print('###############################################################')
-        print('# Rodando o Algoritmo de Bellman-Ford em todos os vértices ...')
-        print('###############################################################\n')
-        for u in G.vertices:
-            result = evalute_time(G.bellman_ford, u)
-            if result == True:
-                print('G não contém ciclos negativos')
-            else:
-                print('G contém ciclos negativos')
-            # show_results(G, u)
+    seconds_passed = 0
+    ticks = 0
 
-        # Roda o Algoritmo de Floyd-Warshall
-        print('###############################################################')
-        print('# Rodando o Algoritmo de Floyd-Warshall ...')
-        print('###############################################################\n')
-        distance_matrix = evalute_time(G.floyd_warshall)
-        print('  ', end='')
-        for i in range(0, len(G.vertices)):
-            print("  {}  ".format(i), end='')
-        print('')
-        for n, row in enumerate(distance_matrix):
-            print('{} '.format(n), end='')
-            for line in row:
-                if isinstance(line, float):
-                    msg = '[{}]'
-                else:
-                    msg = '[{0:3d}]'
-                print(msg.format(line), end='')
-            print('')
-        print('')
+    # Entra no loop principal
+    done = False
+    while not done:
+        try:
+            ########################################################################################
+            # Eventos
+            ########################################################################################
+            for evt in pygame.event.get():
+                if evt.type == pygame.QUIT:
+                    done = Trues
+
+            ########################################################################################
+            # Atualização
+            ########################################################################################
+
+            dt = millis() - last_update
+            canvas.update(dt)
+            last_update = millis()
+
+            ########################################################################################
+            # Renderização
+            ########################################################################################
+
+            # Renderiza o canvas circular e a fita de leds
+            canvas.render(screen, debug=True)
+
+            # Renderiza os leds em função do tempo
+            # Atualiza o display
+            pygame.display.flip()
+
+        except KeyboardInterrupt:
+            done = True
+
+    # Encerra tudo
+    pygame.quit()
 
 if __name__ == '__main__':
     main()
