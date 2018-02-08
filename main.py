@@ -1,278 +1,271 @@
 # -*- coding: utf-8 -*-
 
-import pygame
-
-import math
 import time
 import random
+import math
 
-# Tamanho da tela
-SCREEN_SIZE = (640*2, 480*2)
+import pygame
 
-# Número de leds na fita
-NUM_OF_LEDS = 5
+#############################################################################################
+# Constantes
+#############################################################################################
 
-PERIOD_RANGE = (200, 1000)
+# Número de partículas que rodam na simulação
+NUMBER_OF_PARTICLES = 30
 
-# '  #     #  ',
-# '   #   #   ',
-# '  #######  ',
-# ' ## ### ## ',
-# '###########',
-# '# ####### #',
-# '# #     # #',
-# '   ## ##   ',
+# Oscilador Harmônico com Amortecimento: F = ma = -kx - cv,
+# kx = força restauradora proporcional à posição e com sentido contrário
+# cv = força amortecedora proporcional à velocidade e com sentido contrário
 
-########################################################################################
-# Padrões de desenho, canvas 5x5
-########################################################################################
+POSITION_FORCE_CONSTANT = 0.001 # => k
+VELOCITY_FORCE_CONSTANT = 0.001 # => c
 
-SPACE_INVADERS_PATTERN = [
+# dimensões da tela
+SCREEN_WIDTH = 640 * 2
+SCREEN_HEIGHT = 480 * 2
+SCREEN_SIZE = (SCREEN_WIDTH, SCREEN_HEIGHT)
 
-    '  #     #       #     #       #     #  ',
-    '   #   #         #   #         #   #   ',
-    '  #######       #######       #######  ',
-    ' ## ### ##     ##-###-##     ## ### ## ',
-    '###########   ###########   ###########',
-    '# ####### #   # ####### #   # ####### #',
-    '# #     # #   # #     # #   # #     # #',
-    '   ## ##         ## ##         ## ##   ',
+# radio de cada 'bolinha'
+NODE_RADIUS = 10
 
-]
+# range das distâncias que as bolas podem ter entre uma e outra
+DISTANCE_RANGE = (10, 1000)
 
-########################################################################################
-# Canvas
-########################################################################################
+#############################################################################################
+# Classe Vetor
+#############################################################################################
 
-class Canvas():
+class Vector():
 
-    def __init__(self, radius, r_partitions, w_partitions, pattern):
-        # Raio
-        self.radius = radius
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
 
-        # Tamanho das partições
-        self.r_partitions = r_partitions
-        self.w_partitions = w_partitions
+    def angleWith(self, v):
+        return math.atan2(self.y - v.y, self.x - v.x)
 
-        # Intervalo de cada partição
-        self.dr = int(self.radius / self.r_partitions)
-        self.dw = int(360 / self.w_partitions)
+    def __str__(self):
+        return '({}, {})'.format(self.x, self.y)
 
-        # Período e fase
-        self.update_period(10)
-        self.phase = 0
+    def __add__(self, v):
+        return Vector(self.x + v.x, self.y + v.y)
 
-        # Padrão a ser renderizado
-        self.pattern = pattern
+    def __sub__(self, v):
+        return Vector(self.x - v.x, self.y - v.y)
 
-        # Limpa a tela
-        self.clean_screen = False
+    def __mul__(self, k):
+        return Vector(self.x * k, self.y * k)
 
-    def update_period(self, new_period):
-        self.period = new_period / 1000 if new_period > 0 else 10 / 1000
-        self.d_phase = math.degrees(-2 * math.pi * (1/self.period))
-        print('Período de Oscilação = {}s'.format(self.period))
+    @staticmethod
+    def distance(u, v):
+        return math.hypot(u.x - v.x, u.y - v.y)
 
-    def update(self, dt):
-        elapsed_time = dt * (10**-3) # ms -> s
+#############################################################################################
+# Classe Partícula
+#############################################################################################
 
-        # Atualiza a posição do fasor
-        self.phase += self.d_phase * elapsed_time
+class Particle():
 
-        # Verifica se é hora de mudar o período
-        if self.phase < -360:
-            self.update_period(
-                random.randrange(
-                    PERIOD_RANGE[0],
-                    PERIOD_RANGE[1]
-                )
-            )
-            self.phase = -(-self.phase % 360)
-            self.clean_screen = True
+    def __init__(self, x, y):
+        self.position = Vector(x, y)
+        self.velocity = Vector(0, 0)
+        self.acceleration = Vector(0, 0)
 
-    def render(self, screen, debug=False):
-        (w, h) = screen.get_size()                  # Dimensões da tela
-        center = (x0, y0) = [ int(w/2), int(h/2) ]  # Centro da tela
+        # para mover com o mouse
+        self.is_selected = False
 
-        # Limpa a tela
-        if self.clean_screen:
-            self.clean_screen = False
-            screen.fill(
-                pygame.Color('white')
-            )
-
-        # Renderiza o círculo do 'mundo'
-        self.draw_canvas(screen, center, debug)
-
-        # Renderiza o fasor posição
-        if debug:
-            self.draw_fasor(screen, center)
-
-        # Renderiza o padrão pré programado
-        self.draw_pattern(screen, center)
-
-    def draw_fasor(self, screen, center):
-        (x0, y0) = center
-        phase = math.radians(self.phase)
-        intersection = [
-            int(x0 + self.radius * math.cos(phase)),
-            int(y0 + self.radius * math.sin(phase))
-        ]
-
-        # Renderiza a reta do vetor de fase
-        pygame.draw.line(
-            screen,
-            pygame.Color('red'),
-            center,
-            intersection,
-            1 # width
-        )
-
-    def draw_pattern(self, screen, center):
-        (x0, y0) = center
-        i = -int(self.phase/self.dw)
-        try:
-            for j in range( len(self.pattern) ):
-
-                # Raio é constante
-                radius = 13
-
-                # position são as coordenadas em função de (i,j)
-                tetha = math.radians(-(i+0.5)*self.dw)
-                # tetha = math.radians(self.phase)
-                position = [
-                    int(x0 + ((j+7) * self.dr) * math.cos(tetha) ),
-                    int(y0 + ((j+7) * self.dr) * math.sin(tetha) )
-                ]
-
-                if self.pattern[j][i] == '#':
-                    pygame.draw.circle(
-                        screen,
-                        pygame.Color('blue'),
-                        position,
-                        radius,
-                        0 # width
-                    )
-        except IndexError:
-            pass
-
-    def draw_canvas(self, screen, center, debug):
-        # Centro do círculo
-        (x0, y0) = center
-
-        # Renderiza o círculo
+    def draw(self, screen):
         pygame.draw.circle(
             screen,
-            pygame.Color('black'),
-            center,
-            self.radius,
-            1 # width
+            pygame.Color('blue'),
+            [ int(self.position.x), int(self.position.y) ],
+            NODE_RADIUS,
+            0   # 0 para que a bolinha fique preta, e não só o contorno
         )
 
-        # Renderiza as coordenadas polares
-        if debug:
-            # Renderiza todos os eixos do versor tetha
-            for i in range(self.w_partitions+1):
-                # Ângulo
-                tetha = math.radians(self.dw * i)
+#############################################################################################
+# Grafo genérico
+#############################################################################################
 
-                # intersecção da reta com o círculo do 'mundo'
-                intersection = [
-                    int(x0 + self.radius * math.cos(tetha)),
-                    int(y0 + self.radius * math.sin(tetha))
-                ]
+class Graph():
 
-                # Renderiza a reta
-                pygame.draw.line(
-                    screen,
-                    pygame.Color('black'),
-                    center,
-                    intersection,
-                    1 # width
-                )
+    class Node():
 
-            # Renderiza os eixos do versor r
-            for i in range(self.r_partitions):
-                pygame.draw.circle(
-                    screen,
-                    pygame.Color('black'),
-                    center,
-                    self.dr * i,
-                    1 if self.dr * i > 0 else 0 # width
-                )
+        def __init__(self, data):
+            self.data = data
+            self.neighbours = []
 
-########################################################################################
+        def addNeighbour(self, node):
+            self.neighbours.append(node)
+
+    def __init__(self):
+        self._nodes = []
+        self._weights = {}
+
+    def addNode(self, clientData):
+        self._nodes.append( Graph.Node(clientData) )
+
+    def addEdge(self, i, j, w):
+        self._nodes[i].addNeighbour(j)
+        if self._nodes[i].data not in self._weights:
+            self._weights[self._nodes[i].data] = { self._nodes[j].data: w }
+        else:
+            self._weights[self._nodes[i].data][self._nodes[j].data] = w
+
+    def nodes(self):
+        for node in self._nodes:
+            yield node.data
+
+    def edges(self):
+        for node in self._nodes:
+            for neighbour in node.neighbours:
+                yield (node.data, self._nodes[neighbour].data )
+
+    def weight(self, u, v):
+        return self._weights[u][v]
+
+#############################################################################################
+# Sistema de Partículas
+#############################################################################################
+
+class ParticleSystem(Graph):
+
+    def __init__(self):
+        super(ParticleSystem, self).__init__()
+
+    def updateParticlePosition(self, particle):
+        particle.velocity += particle.acceleration
+        particle.position += particle.velocity
+        particle.acceleration = Vector(0, 0)
+
+    def updateParticles(self):
+        for particle in self.nodes():
+            self.updateParticlePosition(particle)
+            if particle.is_selected:
+                (x, y) = pygame.mouse.get_pos()
+                mousePosition = Vector(x, y)
+                particle.position = mousePosition
+
+#############################################################################################
+# Sistema de Molas
+#############################################################################################
+
+class SpringSystem():
+
+    def __init__(self, k, c):
+        self.k = k
+        self.c = c
+
+    def relativePosition(self, u, v):
+        return u.position - v.position
+
+    def relativeVelocity(self, u, v):
+        return u.velocity - v.velocity
+
+    def distanceVector(self, u, v, norm):
+        angle = u.position.angleWith(v.position)
+        return Vector(
+            norm * math.cos(angle),
+            norm * math.sin(angle)
+        )
+
+    def calculateSpringForce(self, u, v, distance):
+        force = ( self.relativePosition(u, v) - self.distanceVector(u, v, distance) ) * self.k
+        force += self.relativeVelocity(u, v) * self.c
+        return force
+
+    def applyForces(self, graph):
+        for (u, v) in graph.edges():
+            distance = min(graph.weight(u, v), graph.weight(v, u))
+            v.acceleration += self.calculateSpringForce(u, v, distance)
+
+#############################################################################################
 # Driver
-########################################################################################
+#############################################################################################
 
 def main():
     # Inicia pygame
     pygame.init()
 
-    # Tela e clock
-    screen  = pygame.display.set_mode(SCREEN_SIZE)
-    screen.fill(
-        pygame.Color('white')
-    )
+    # Variáveis da plataforma
+    screen = pygame.display.set_mode(SCREEN_SIZE)
     clock = pygame.time.Clock()
 
-    # Canvas circular
-    canvas = Canvas(
-        radius=500,
-        r_partitions=20,
-        w_partitions=50,
-        pattern=SPACE_INVADERS_PATTERN
+    # Cria o sistema de molas
+    springSystem = SpringSystem(
+        k=POSITION_FORCE_CONSTANT,
+        c=VELOCITY_FORCE_CONSTANT
     )
 
-    def millis():
-        return time.time() * 1000
+    # Monta o grafo com partículas
+    particleSystem = ParticleSystem()
+    for i in range(NUMBER_OF_PARTICLES):
+        particleSystem.addNode(
+            Particle(
+                random.randrange(0, SCREEN_WIDTH),
+                random.randrange(0, SCREEN_HEIGHT)
+            )
+        )
+    for i in range(NUMBER_OF_PARTICLES):
+        for j in range(NUMBER_OF_PARTICLES):
+            if i != j:
+                particleSystem.addEdge(
+                    i, j,
+                    random.randrange(DISTANCE_RANGE[0], DISTANCE_RANGE[1])
+                )
 
-    # Variáveis de tempo
-    updates_per_second = 30
-    update_interval = 1000 / updates_per_second
-    last_update = millis()
-
-    # Limpeza de tela
-    clean_interval = len(canvas.pattern) * 1000
-    last_screen_clean = millis()
-
-    seconds_passed = 0
-    ticks = 0
-
-    # Entra no loop principal
+    # loop principal
     done = False
     while not done:
-        try:
-            ########################################################################################
-            # Eventos
-            ########################################################################################
-            for evt in pygame.event.get():
-                if evt.type == pygame.QUIT:
-                    done = Trues
 
-            ########################################################################################
-            # Atualização
-            ########################################################################################
+        # Despacha os eventos
+        for e in pygame.event.get():
 
-            dt = millis() - last_update
-            canvas.update(dt)
-            last_update = millis()
+            # evento de encerramento de janela
+            if e.type == pygame.QUIT:
+                done = True
 
-            ########################################################################################
-            # Renderização
-            ########################################################################################
+            # evento de clique do mouse
+            if e.type == pygame.MOUSEBUTTONDOWN:
+                (x, y) = pygame.mouse.get_pos()
+                mousePosition = Vector(x, y)
+                for particle in particleSystem.nodes():
+                    if Vector.distance(mousePosition, particle.position) < NODE_RADIUS:
+                        particle.is_selected = True
 
-            # Renderiza o canvas circular e a fita de leds
-            canvas.render(screen, debug=True)
+            # evento de soltar o botão do mouse
+            if e.type == pygame.MOUSEBUTTONUP:
+                for particle in particleSystem.nodes():
+                    particle.is_selected = False
 
-            # Renderiza os leds em função do tempo
-            # Atualiza o display
-            pygame.display.flip()
+        # Atualiza o sistema de forças e aplica as acelerações
+        springSystem.applyForces(particleSystem)
 
-        except KeyboardInterrupt:
-            done = True
+        # Aplica as forças
+        particleSystem.updateParticles()
 
-    # Encerra tudo
+        # limpa a tela
+        screen.fill( pygame.Color('white') )
+
+        # Renderiza as linhas das arestas
+        for (u, v) in particleSystem.edges():
+            pygame.draw.line(
+                screen,
+                pygame.Color('black'),
+                [ int(u.position.x), int(u.position.y) ],
+                [ int(v.position.x), int(v.position.y) ],
+                1
+            )
+
+        # Renderiza as partículas
+        for particle in particleSystem.nodes():
+            particle.draw(screen)
+
+        # 'flipa' o display
+        pygame.display.flip()
+        clock.tick(30)
+
+    # Encerra
     pygame.quit()
 
 if __name__ == '__main__':
