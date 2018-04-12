@@ -66,7 +66,7 @@ namespace Algorithms
             int right_child = (root << 1) + 2 - ref;
 
             #define child_is_greater_than_parent(child) fn( v.at(root), v.at(child) )
-            
+
             // Verifica se o nó esquerdo é o maior
             if (left_child < end and child_is_greater_than_parent(left_child))
                 root = left_child;
@@ -74,7 +74,7 @@ namespace Algorithms
             // Verifica se o nó direito é o maior
             if (right_child < end and child_is_greater_than_parent(right_child))
                 root = right_child;
-            
+
             #undef child_is_greater_than_parent
 
             // Verifica se é necessário mudar a estrutura da árvore
@@ -213,7 +213,7 @@ public:
     double last_call_time() const { return this->_last_call_time; }
 
     double last_call_time_real() const { return this->_last_call_time_real; }
-    
+
     std::pair<double, double> average_time() const
     {
         std::pair<double, double> average = { 0, 0 };
@@ -262,6 +262,7 @@ protected:
             this->_sort(v, begin, mid, fn);
             this->_sort(v, mid, end, fn);
         }
+
         // Intercala os vetores w = v[begin, mid) e u = v[mid, end)
         this->_merge_type(v, begin, mid, end, fn);
     }
@@ -309,6 +310,7 @@ protected:
 //  Implementação do algoritmo Heap Sort
 //
 // ########################################################################
+
 class HeapSort:
     public SortingAlgorithm
 {
@@ -323,7 +325,7 @@ protected:
         // Transforma o vetor em uma maxheap
         for (int i = (end/2) + 1; i > begin; i--)
             Algorithms::heapify(v, begin, i-1, end, fn);
-        
+
         for (int i = end; i > begin; i--)
         {
             // Troca o valor no topo da heap com o último elemento
