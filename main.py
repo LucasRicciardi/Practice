@@ -28,16 +28,16 @@ def secant(x, max_iters=100):
     (a, b) = (0, x+1)
     for i in range(max_iters):
         try:
-            c = b - f(b) * ((b-a) / (f(b) - f(a)))
+            c = b - f(b) * ((b-a) / (f(b) - f(a)))            
         except ZeroDivisionError:
-            break
+            continue
         (a, b) = (b, c)
     return c
 
 def main():
     done = False
     while not done:
-        x = input('Digite um número --> ')
+        x = input('Digite um número (ou "q" para sair) --> ')
         if x == 'q':
             done = True
         else:            
