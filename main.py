@@ -12,7 +12,7 @@ def bisection(x, max_iters=100):
     def sign(x):
         return abs(x) / x
     (a, b) = (0, x + 1)    
-    for i in range(max_iters):
+    for _ in range(max_iters):
         c = (a + b) / 2
         if f(c) == 0:
             return c
@@ -26,7 +26,7 @@ def secant(x, max_iters=100):
     def f(n):
         return n ** 2 - x
     (a, b) = (0, x+1)
-    for i in range(max_iters):
+    for _ in range(max_iters):
         try:
             c = b - f(b) * ((b-a) / (f(b) - f(a)))            
         except ZeroDivisionError:
